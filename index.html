@@ -2432,24 +2432,67 @@ function applyBlurredBg(url, targetEl) {
 
             ctx.drawImage(img, x, y, w, h);
 
-            // 2. Scale up to a final canvas with additional filter if possible
+            // 2. Blur manually (ctx.filter is not supported on Safari/iOS): box blur x3 on the tiny canvas
+            const BLUR_RADIUS = 6; // in tiny-canvas pixels
+            const BLUR_PASSES = 3;
+            const imgData = ctx.getImageData(0, 0, tinyW, tinyH);
+            const px = imgData.data;
+            const tmp = new Uint8ClampedArray(px.length);
+            const boxPass = (src, dst, horizontal) => {
+                const len = horizontal ? tinyW : tinyH;
+                const lines = horizontal ? tinyH : tinyW;
+                const stride = horizontal ? 4 : tinyW * 4;
+                const lineStride = horizontal ? tinyW * 4 : 4;
+                const win = BLUR_RADIUS * 2 + 1;
+                for (let l = 0; l < lines; l++) {
+                    const base = l * lineStride;
+                    for (let c = 0; c < 3; c++) {
+                        let sum = 0;
+                        for (let k = -BLUR_RADIUS; k <= BLUR_RADIUS; k++) {
+                            const idx = Math.min(len - 1, Math.max(0, k));
+                            sum += src[base + idx * stride + c];
+                        }
+                        for (let i = 0; i < len; i++) {
+                            dst[base + i * stride + c] = sum / win;
+                            const add = Math.min(len - 1, i + BLUR_RADIUS + 1);
+                            const rem = Math.max(0, i - BLUR_RADIUS);
+                            sum += src[base + add * stride + c] - src[base + rem * stride + c];
+                        }
+                    }
+                    for (let i = 0; i < len; i++) dst[base + i * stride + 3] = 255;
+                }
+            };
+            for (let n = 0; n < BLUR_PASSES; n++) {
+                boxPass(px, tmp, true);
+                boxPass(tmp, px, false);
+            }
+            ctx.putImageData(imgData, 0, 0);
+
+            // 3. Upscale smoothly in 2x steps (avoids blocky pixels) to the final canvas
+            let cur = canvas;
+            while (cur.width * 2 < 400) {
+                const step = document.createElement('canvas');
+                step.width = cur.width * 2;
+                step.height = cur.height * 2;
+                const sctx = step.getContext('2d');
+                sctx.imageSmoothingEnabled = true;
+                sctx.imageSmoothingQuality = 'high';
+                sctx.drawImage(cur, 0, 0, step.width, step.height);
+                cur = step;
+            }
             const finalCanvas = document.createElement('canvas');
             finalCanvas.width = 400;
             finalCanvas.height = 600;
             const finalCtx = finalCanvas.getContext('2d');
+            finalCtx.imageSmoothingEnabled = true;
+            finalCtx.imageSmoothingQuality = 'high';
+            finalCtx.drawImage(cur, 0, 0, finalCanvas.width, finalCanvas.height);
 
-            // Dark overlay
-            finalCtx.fillStyle = "#000";
+            // Darken (same as brightness 0.6)
+            finalCtx.fillStyle = 'rgba(0,0,0,0.4)';
             finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
 
-            if ('filter' in finalCtx) {
-                finalCtx.filter = 'blur(32px) brightness(0.6)';
-            }
-
-            finalCtx.imageSmoothingEnabled = true;
-            finalCtx.drawImage(canvas, 0, 0, finalCanvas.width, finalCanvas.height);
-
-            // 3. Apply as background
+            // 4. Apply as background
             const blurredData = finalCanvas.toDataURL('image/jpeg', 0.8);
             targetEl.style.backgroundImage = `url(${blurredData})`;
         } catch (e) {
