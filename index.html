@@ -2419,8 +2419,8 @@ function applyBlurredBg(url, targetEl) {
             const ctx = canvas.getContext('2d');
 
             // 1. Draw to a tiny canvas (low-res = natural blur)
-            const tinyW = 400;
-            const tinyH = 600;
+            const tinyW = 50;
+            const tinyH = 70;
             canvas.width = tinyW;
             canvas.height = tinyH;
 
@@ -2443,7 +2443,7 @@ function applyBlurredBg(url, targetEl) {
             finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
 
             if ('filter' in finalCtx) {
-                finalCtx.filter = 'blur(32px) brightness(0.6)';
+                finalCtx.filter = 'blur(16px) brightness(0.6)';
             }
 
             finalCtx.imageSmoothingEnabled = true;
