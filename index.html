@@ -2443,11 +2443,11 @@ function applyBlurredBg(url, targetEl) {
             finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
 
             if ('filter' in finalCtx) {
-                finalCtx.filter = 'blur(100px) brightness(0.6)';
+                finalCtx.filter = 'blur(300px) brightness(0.6)';
             }
 
             finalCtx.imageSmoothingEnabled = true;
-            finalCtx.drawImage(canvas, -200, -200, finalCanvas.width + 400, finalCanvas.height + 400); // oversize so blur doesn't darken edges
+            finalCtx.drawImage(canvas, -600, -600, finalCanvas.width + 1200, finalCanvas.height + 1200); // oversize so blur doesn't darken edges
 
             // 3. Apply as background
             const blurredData = finalCanvas.toDataURL('image/jpeg', 0.8);
