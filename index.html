@@ -4992,42 +4992,70 @@ if (document.readyState === 'loading') {
 }
 
 // URL Parameter Queue Import
+// Supports both the compact share format (?=id1,id2~tier,V:123,S:url) and the legacy JSON array format.
 function initFromUrlParams() {
     try {
         const urlParams = window.location.search;
-        // Check for ?= format
-        if (urlParams.startsWith('?=')) {
-            const encoded = urlParams.substring(2); // Remove "?="
-            const decoded = decodeURIComponent(encoded);
-            const importedQueue = JSON.parse(decoded);
+        if (!urlParams.startsWith('?=')) return;
 
-            if (Array.isArray(importedQueue) && importedQueue.length > 0) {
-                // Validate and sanitize imported items
-                const validTypes = ['youtube', 'soundcloud', 'vimeo'];
-                const sanitized = importedQueue
+        const decoded = decodeURIComponent(urlParams.substring(2)).trim();
+        if (!decoded) return;
+
+        const validTypes = ['youtube', 'soundcloud', 'vimeo'];
+        let imported = [];
+
+        if (decoded.startsWith('[')) {
+            // Legacy JSON format
+            const parsed = JSON.parse(decoded);
+            if (Array.isArray(parsed)) {
+                imported = parsed
                     .filter(item => item.id && validTypes.includes(item.type || 'youtube'))
                     .map(item => ({
                         id: item.id,
                         type: item.type || 'youtube',
-                        title: item.title || 'Untitled',
-                        author: item.author || 'Unknown',
-                        tier: item.tier || '×',
+                        title: item.title || 'Loading...',
+                        author: item.author || '',
+                        tier: item.tier || '0',
                         lastTime: 0,
                         duration: 0,
                         memo: ''
                     }));
-
-                if (sanitized.length > 0) {
-                    queue = [...queue, ...sanitized];
-                    if (typeof renderQueue === 'function') renderQueue();
-                    console.log(`Imported ${sanitized.length} tracks from URL`);
-
-                    // Clean URL after import (optional, remove query string)
-                    if (window.history && window.history.replaceState) {
-                        window.history.replaceState({}, document.title, window.location.pathname);
-                    }
-                }
             }
+        } else {
+            // Compact format (also tolerate full YouTube URLs / spaces / newlines as separators)
+            const normalized = decoded.replace(/[\s]+/g, ',');
+            imported = decodeShareData(normalized).map(item => {
+                if (item.type === 'youtube') {
+                    const vid = extractId(item.id);
+                    if (vid) item.id = vid;
+                }
+                return item;
+            });
+        }
+
+        if (imported.length === 0) return;
+
+        const startIdx = queue.length;
+        queue = [...queue, ...imported];
+        if (typeof renderQueue === 'function') renderQueue();
+        console.log(`Imported ${imported.length} tracks from URL`);
+
+        // Fill in titles/authors for YouTube items in the background
+        imported.forEach(async (item) => {
+            if (item.type !== 'youtube' || item.title !== 'Loading...') return;
+            try {
+                const meta = await getMetaData(item.id);
+                if (meta && meta.title && !/^Video \(/.test(meta.title)) {
+                    item.title = meta.title;
+                    item.author = meta.author || item.author;
+                    if (typeof renderQueue === 'function') renderQueue();
+                }
+            } catch (e) { /* keep placeholder */ }
+        });
+
+        // Clean URL after import
+        if (window.history && window.history.replaceState) {
+            window.history.replaceState({}, document.title, window.location.pathname);
         }
     } catch (e) {
         console.error('Failed to parse URL params:', e);
