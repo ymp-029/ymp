@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>微分音 コード・楽譜</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f6f8f5;--fg:#222;--mut:#777;--card:#fff;--bd:#d3dcd0;--ac:#2f7d4f;--acbg:#dcefe3}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171a17;--fg:#eee;--mut:#9aa39a;--card:#222622;--bd:#38403a;--ac:#6fcf97;--acbg:#26402f}}
+:root[data-theme="dark"]{--bg:#171a17;--fg:#eee;--mut:#9aa39a;--card:#222622;--bd:#38403a;--ac:#6fcf97;--acbg:#26402f}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,"Hiragino Sans","Noto Sans JP",sans-serif}
+main{max-width:860px;margin:0 auto;padding:16px}
+h1{font-size:1.3rem;margin:.2em 0}
+.sub,.alias{color:var(--mut);font-size:.85rem}.sub{margin:0 0 14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:14px}
+.row{display:flex;flex-wrap:wrap;gap:10px}
+label{display:flex;flex-direction:column;font-size:.75rem;color:var(--mut);gap:3px;flex:1 1 140px}
+select,button,input,textarea{font:inherit;padding:7px 8px;border-radius:7px;border:1px solid var(--bd);background:var(--card);color:var(--fg)}
+button{cursor:pointer}button.p{background:var(--ac);color:var(--card);border-color:var(--ac)}
+.name{font-size:2rem;font-weight:700;margin:4px 0}
+.notes,.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chips{gap:6px}.chips button{font-size:.8rem;padding:4px 9px}
+.n{border:1px solid var(--bd);border-radius:8px;padding:8px 12px;text-align:center;min-width:84px}
+.n b{display:block;font-size:1.3rem}.n small{display:block;color:var(--mut);font-size:.72rem}
+.tb{border-collapse:collapse;font-size:.8rem}.tb th,.tb td{border:1px solid var(--bd);padding:3px 7px;text-align:center;white-space:nowrap}.tb th{background:var(--acbg)}
+a{color:var(--ac)}
+main{display:flex;flex-direction:column}#colR{display:contents}#stepCard{order:5}#legendCard{order:6}
+@media(min-width:1100px){main{max-width:1560px;display:grid;grid-template-columns:minmax(0,1fr) 520px;column-gap:16px;align-items:start}main>*{grid-column:1}main>#colR{display:block;grid-column:2;grid-row:1/span 6;position:sticky;top:8px;max-height:calc(100vh - 16px);overflow:auto}#colR #stepCard{order:0;max-height:44vh;overflow:auto}}
+@media print{body *{visibility:hidden}#sheet,#sheet *{visibility:visible}#sheet{position:absolute;left:0;top:0;width:100%}#sheet svg{color:#000!important;max-width:100%;height:auto}body{background:#fff}}@page{size:A4 landscape;margin:10mm}
+</style></head><body><main>
+<h1>微分音 コード検索・楽譜</h1>
+<div class="card"><div class="row"><label>平均律<select id="edo"><option value="12">12edo</option><option value="12ji">12JI(5リミット純正)</option><option value="31">31edo</option><option value="41">41edo</option><option value="53">53edo</option></select></label><label>音色(20種・上段/共通)<select id="timbre"></select></label><label>音色(下段・大譜表の L: 行)<select id="timbre2"></select></label></div><p class="sub" id="subtxt" style="margin:8px 0 0"></p></div>
+
+<div id="colR">
+<div class="card" id="stepCard">
+ <b>ステップ表</b><span class="alias">(音名・別名・近い純正比。比は奇数リミット49以内、誤差±8c以内の上位3つ)</span>
+ <div style="overflow-x:auto;margin-top:8px"><table class="tb" id="stepTable"></table></div>
+</div>
+
+<div class="card">
+ <div class="row">
+  <label>ルート<select id="root"></select></label>
+  <label>3度 / 2度 / 4度<select id="third"></select></label>
+  <label>5度<select id="fifth"></select></label>
+  <label>6度・7度(追加)<select id="ext"></select></label>
+ </div>
+ <div class="chips" id="presets"></div>
+</div>
+
+<div class="card">
+ <div class="name" id="cname"></div>
+ <div class="alias" id="steps"></div>
+ <div class="notes" id="notes"></div>
+ <div style="margin-top:12px"><button class="p" id="play">▶ 再生</button> <button id="arp">アルペジオ</button></div>
+</div>
+
+<div class="card">
+ <b>逆引き</b><span class="alias">(音名か step をスペース区切り。例: C E. G / C F A / 0 13 24。先頭 = ベース)</span>
+ <div class="row" style="margin-top:8px"><input id="rin" value="C E. G" style="flex:1 1 200px"><button class="p" id="rgo">逆引き</button></div>
+ <div class="alias" id="rinfo" style="margin-top:8px"></div>
+ <div class="chips" id="rout"></div>
+</div>
+
+</div>
+<div class="card">
+ <b>楽譜入力で演奏</b>
+ <textarea id="score" rows="11" spellcheck="false" style="width:100%;margin-top:8px;font-family:ui-monospace,Menlo,monospace"></textarea>
+ <div style="margin-top:8px"><button class="p" id="splay">▶ 演奏</button> <button id="sstop">■ 停止</button> <button id="spdf">PDF保存(印刷)</button> <button id="swav">WAV出力</button> <button id="smp3">MP3出力</button> <span class="alias" id="astat"></span></div>
+ <div class="alias" id="sinfo" style="margin-top:8px"></div>
+ <div id="sheet" style="overflow-x:auto;margin-top:10px"></div>
+ <div style="margin-top:8px"><button id="stex">LaTeX (TikZ) を生成</button> <button id="scopy">コピー</button></div>
+ <textarea id="tex" rows="9" readonly spellcheck="false" style="width:100%;margin-top:6px;font-family:ui-monospace,Menlo,monospace;font-size:.75rem;display:none"></textarea>
+ <details style="margin-top:8px"><summary>書き方</summary><div class="alias" style="line-height:1.8">
+  <code>4/4</code> 拍子 / <code>4=120</code> テンポ(4分音符=120) / <code>#b=n</code> 調号なし(<code>#b=Bb Eb</code> のように指定も可。打ち消す音は <code>Bn</code>)<br>
+  音: <code>C E. G Dd.</code> などルート選択と同じ記法。和音は <code>-</code> でつなぐ: <code>C-E.-G</code>(上へ自動で積む)<br>
+  長さ: 末尾の数字 = 音価(<code>2</code>=2分、<code>4</code>=4分、<code>8</code>=8分…)。無指定 = 4分。<code>2.</code> = 付点。休符 = <code>r4</code><br>
+  音域: <code>o5</code> でその行のオクターブ指定(既定4、C4=261.63Hz)。音の前に <code>&lt;</code> <code>&gt;</code> を付けるとその音だけ1オクターブ下・上。次の音はその音から上へ積む<br>
+  スペースで時間順に並ぶ。<b>改行1つ = 次の行を同時演奏</b>、<b>空行(改行2つ) = 次の小節へ</b>。<code>//</code> 以降はコメント<br><code>#b=...</code> を空行の後ろに書くと、その小節から調号が切り替わる(小節の途中に書いた場合は次の小節から)<br><code>#b=#</code>(♯1つ = F♯)、<code>#b=##</code>、<code>#b=b</code>(♭1つ = B♭)、<code>#b=bbb</code> のように記号の数でも調号を指定できます(♯系は F C G D A E B、♭系は B E A D G C F の順)。<br><code>4=90</code> のテンポ指定も同じルールで小節ごとに変更できます。五線譜は下に表示されます(臨時記号は音符の左に記号で描画: <code>#</code>♯ <code>b</code>♭ <code>j</code>半♯ <code>d</code>半♭ <code>'</code>↑ <code>.</code>↓ <code>n</code>♮)<br><code>~</code> = タイ/スラー。音の末尾に付けます(<code>C2~ C4</code>)。次の音が同じ高さならタイ(音が続く)、違う高さならスラー(レガート)。単独の <code>~</code> でも可<br><code>,</code> = スタッカート(音の末尾に付けます: <code>C4,</code>、<code>C4,~</code> も可)。音を約4割の長さにし、符頭の反対側に点を描きます<br><code>!</code> = アクセント(音の末尾: <code>C4!</code>、<code>C4,!</code> も可。音量を上げ、符頭の反対側に > を描きます)<br><b>連符</b>: <code>[C8 D8 E8]3</code> は3連符(n個を、nより小さい最大の2の冪個ぶんの長さに収める: 3:2、5:4、6:4、7:4)。比を直接指定するなら <code>[…]5:6</code>。休符も入れられます。<br><b>大譜表(2段)</b>: <code>staff=grand</code> を単独の行で書く。行の先頭に <code>L:</code> を付けると下段(ヘ音記号・既定のオクターブ3)、<code>R:</code> か無印は上段(ト音記号)。<br><b>トレモロ</b>: <code>C2/3</code>(末尾に <code>/1</code>〜<code>/3</code>。斜線の数=8分・16分・32分で刻む)。<b>グリッサンド</b>: <code>C4\ G4</code>(末尾に <code>\</code>。次の音まで滑る)。<br><b>拍子の変更</b>: 空行の後ろに <code>3/4</code> と書くとその小節から切り替わる(調号・テンポと同じ規則)。<b>リピート</b>: 小節の前に <code>|:</code>、後ろに <code>:|</code>(<code>:|x3</code> で3回演奏)を単独の行で書く(演奏時に繰り返し)。<br><b>強弱</b>(単独の語として行の中に書き、その行のこれ以降の音に効きます): <code>ppp pp p mp mf f ff fff</code>(小文字のみ、既定は mf)、<code>sfz</code>/<code>sf</code> は次の音だけ強打、<code>cre</code> は次の強弱記号(なければ約1.6倍)までクレッシェンド、<code>dim</code>/<code>dec</code> は同様にディミヌエンド。五線の下に記号とヘアピンを描きます。注意: 小文字の <code>f</code> は強弱記号になるので、音名は <code>F</code> と大文字で書いてください
+ </div></details>
+</div>
+
+<div class="card alias" id="legendCard" style="line-height:1.7">
+ <b>記号の約束</b>(この名前付けは独自):<br>
+ 3度 <code>=</code> 7/6、<code>−py</code> 32/27、<code>−</code> 6/5、<code>◻</code> 11/9、無印 5/4、<code>py</code> 81/64、<code>▲</code> 9/7。
+ <code>∘</code> dim、<code>+</code> aug、<code>∅</code> half-dim、<code>H7</code> 4:5:6:7。<br>
+ 5度の増減は <code>(5-1)</code> のように step 差で表記。6度・7度は <code>6</code> 5/3、<code>6py</code> 27/16、<code>7</code> 9/5、<code>7py</code> 16/9、<code>△7</code> 15/8、<code>△7py</code> 243/128。
+</div>
+<script>
+let N=41,LV={},CENT=[],KIND={},CFG;const $=id=>document.getElementById(id);
+let prim=[];
+let AC={};
+function names(s){const o=[prim[s]];for(const L in LV){const d=((s-LV[L]+(N>>1))%N+N)%N-(N>>1);if(AC[d]!==undefined&&!o.includes(L+AC[d]))o.push(L+AC[d])}return o}
+let ACC={};
+function parseNote(t){
+ if(/^\d+$/.test(t))return(+t)%N;
+ const L=t[0]&&t[0].toUpperCase();if(LV[L]===undefined)return null;
+ let s=LV[L];for(const c of t.slice(1)){if(ACC[c]===undefined)return null;s+=ACC[c]}
+ return((s%N)+N)%N;
+}
+let TH=[],FI=[],EX=[];
+let QS={},FM={},DL={},RT={};
+
+let SP={};
+function suffix(t,f,e){
+ const k=t+","+f;
+ if(CFG.h7&&t===CFG.h7[0]&&f===CFG.h7[1]&&e===CFG.h7[2])return"H7";
+ if(CFG.hd&&k===CFG.hd[0]+","+CFG.hd[1]&&e===CFG.hd[2])return"∅";
+ if(SP[k])return SP[k]+(e?DL[e]:"");
+ return QS[t]+(e?((t<=CFG.sl||t>=CFG.sh)?",":"")+DL[e]:"")+FM[f];
+}
+let PRE=[];const st={root:0,t:13,f:24,e:0};
+function fill(sel,arr,lab){arr.forEach(x=>{const o=document.createElement("option");o.value=x[0];o.textContent=lab(x);sel.appendChild(o)})}
+function buildUI(){["root","third","fifth","ext","presets"].forEach(i=>$(i).innerHTML="");
+for(let s=0;s<N;s++){const o=document.createElement("option");o.value=s;o.textContent=prim[s]+" ("+s+")";$("root").appendChild(o)}
+fill($("third"),TH,x=>x[0]+"  "+x[2]+(x[1]?"  ["+x[1]+"]":""));
+fill($("fifth"),FI,x=>x[0]+"  "+x[2]);
+fill($("ext"),EX,x=>x[0]?x[0]+"  "+x[2]+"  ["+x[1]+"]":"なし");
+PRE.forEach(p=>{const b=document.createElement("button");b.textContent=p[0];b.onclick=()=>{st.t=p[1];st.f=p[2];st.e=p[3];render()};$("presets").appendChild(b)});
+}
+["root","third","fifth","ext"].forEach(id=>$(id).onchange=()=>{st.root=+$("root").value;st.t=+$("third").value;st.f=+$("fifth").value;st.e=+$("ext").value;render()});
+let cur=[];
+function render(){
+ $("root").value=st.root;$("third").value=st.t;$("fifth").value=st.f;$("ext").value=st.e;
+ $("cname").textContent=prim[st.root]+suffix(st.t,st.f,st.e);
+ const d=[0,st.t];if(st.f)d.push(st.f);if(st.e)d.push(st.e);
+ cur=d.map(x=>st.root+x);
+ $("steps").textContent="ルートからの step: "+d.join(" – ")+"  /  絶対 step: "+cur.map(x=>x%N).join(" – ");
+ $("notes").innerHTML=d.map((x,i)=>{const nm=names(cur[i]%N);return `<div class="n"><small>${x} st${RT[x]?" · "+RT[x]:""}</small><b>${nm[0]}</b><small>${nm.slice(1).join(" = ")||"&nbsp;"}</small><small>${cc(x).toFixed(1)}c</small></div>`}).join("");
+}
+let ac;
+function play(arp){TB=TBU;
+ ac=ac||new(window.AudioContext||window.webkitAudioContext)();ac.resume();
+ const t0=ac.currentTime+.05;
+ cur.forEach((a,i)=>{const o=ac.createOscillator(),g=ac.createGain();tim(o);
+  o.frequency.value=hz(a);const s=t0+(arp?i*.35:0),d=arp?1.2:1.8;
+  {const A=Math.min(TB.a,d*.5);g.gain.setValueAtTime(0,s);g.gain.linearRampToValueAtTime(.18,s+A);g.gain.exponentialRampToValueAtTime(Math.max(.001,.18*TB.s),s+Math.max(A+.01,d-.05));g.gain.exponentialRampToValueAtTime(.001,s+d)}
+  if(e.glTo!==undefined&&a===e.steps[0]){o.frequency.setValueAtTime(hz(a),s);o.frequency.exponentialRampToValueAtTime(hz(e.glTo),s+d)}o.connect(g).connect(ac.destination);o.start(s);o.stop(s+d+.05)});
+}
+$("play").onclick=()=>play(false);$("arp").onclick=()=>play(true);
+let IDX={};function buildIdx(){IDX={};
+TH.forEach(([t])=>FI.forEach(([f])=>EX.forEach(([e])=>{
+ if(!f&&!e)return;
+ const key=[...new Set([0,t,f,e].filter((x,i)=>i<2||x))].sort((a,b)=>a-b).join(",");
+ (IDX[key]=IDX[key]||[]).push({t,f,e});
+})));}
+const score=m=>(m.f?0:2)+(m.e?1:0)+(CFG.mn.includes(m.t)?0:1);
+function rev(){
+ const ps=$("rin").value.trim().split(/[\s,\-–]+/).filter(Boolean).map(parseNote);
+ if(!ps.length||ps.some(x=>x===null)){$("rinfo").textContent="読み取れない音があります";$("rout").innerHTML="";return}
+ const bass=ps[0],set=[...new Set(ps)];
+ $("rinfo").textContent="入力: "+ps.map(p=>prim[p]+"("+p+")").join(" ");
+ const out=[];
+ set.forEach(r=>{
+  const key=set.map(p=>((p-r)%N+N)%N).sort((a,b)=>a-b).join(",");
+  (IDX[key]||[]).forEach(m=>out.push({r,m}));
+ });
+ out.sort((a,b)=>(a.r===bass?0:10)+score(a.m)-((b.r===bass?0:10)+score(b.m)));
+ $("rout").innerHTML=out.length?"":"該当なし";
+ out.forEach(({r,m})=>{
+  const b=document.createElement("button");
+  b.textContent=prim[r]+suffix(m.t,m.f,m.e)+(r!==bass?" / "+prim[bass]:"");
+  b.title="root "+prim[r]+" : 0-"+[m.t,m.f,m.e].filter(Boolean).join("-");
+  b.onclick=()=>{st.root=r;st.t=m.t;st.f=m.f;st.e=m.e;render();window.scrollTo(0,0)};
+  $("rout").appendChild(b);
+ });
+}
+$("rgo").onclick=rev;$("rin").onkeydown=e=>{if(e.key==="Enter")rev()};
+function scoreNote(tok,ks){
+ const m=/^([A-Ga-g])$/.exec(tok);
+ if(m){const L=m[1].toUpperCase();return(((LV[L]+(ks[L]||0))%N)+N)%N}
+ return parseNote(tok.replace(/n/g,""));
+}
+function parseScoreOld(src){
+ let ts=[4,4],bpm=120,bn=4;const blocks=[],warn=[];let cur=[],curKs={},later=null,blockKs=null;
+ for(const raw of src.split("\n")){
+  const ln=raw.replace(/(\/\/|;).*$/,"").trim();let m;
+  if(!ln){if(cur.length){blocks.push({lines:cur,ks:blockKs});cur=[];if(later){curKs=later;later=null}}continue}
+  if(m=/^(\d+)\/(\d+)$/.exec(ln)){ts=[+m[1],+m[2]];continue}
+  if(m=/^(\d+)=(\d+(?:\.\d+)?)$/.exec(ln)){bn=+m[1];bpm=+m[2];continue}
+  if(m=/^#b=(.*)$/i.exec(ln)){const ks={},v=m[1].trim();if(v&&!/^n$/i.test(v))v.split(/[\s,]+/).forEach(t=>{const L=/[A-Ga-g]/.exec(t),s=parseNote(t);if(L&&s!==null){const l=L[0].toUpperCase();let d=((s-LV[l])%N+N)%N;if(d>26)d-=N;ks[l]=d}});if(cur.length)later=ks;else curKs=ks;continue}
+  if(!cur.length)blockKs=curKs;cur.push(ln);
+ }
+ if(cur.length)blocks.push({lines:cur,ks:blockKs});
+ const bar=4*ts[0]/ts[1];let t0=0,barNo=1;const ev=[];
+ blocks.forEach((B,bix)=>{
+  let mx=0;const ks=B.ks||{};
+  B.lines.forEach((line,lix)=>{
+   let pos=0,oct=4;
+   for(const tok of tupl(line).split(/[\s|]+/).filter(Boolean)){
+    const mo=/^o(\d)$/i.exec(tok);if(mo){oct=+mo[1];continue}
+    let body=tok,den=4,dot=false;
+    const md=/^(.*?)(\d+)(\.?)$/.exec(tok);
+    if(md){body=md[1];den=+md[2];dot=!!md[3]}
+    if(!den){warn.push("音価が不正: "+tok);continue}
+    const dur=4/den*(dot?1.5:1);
+    if(/^r$/i.test(body)){pos+=dur;continue}
+    const steps=[];let prev=null,bad=false;
+    body.split("-").forEach(nt=>{
+     const sh=/^[<>]*/.exec(nt)[0],s=scoreNote(nt.slice(sh.length),ks);
+     if(s===null||nt.length===sh.length){bad=true;return}
+     const sc=[...sh].reduce((a,c)=>a+(c===">"?1:-1),0);
+     let a0;if(prev===null)a0=s+N*(oct-4);else{a0=s+N*Math.floor(prev/N);while(a0<=prev)a0+=N}
+     prev=a0+N*sc;steps.push(prev);
+    });
+    if(bad){warn.push("読み取れない: "+tok);pos+=dur;continue}
+    ev.push({t:t0+pos,d:dur,steps});pos+=dur;
+   }
+   mx=Math.max(mx,pos);
+  });
+  const nb=Math.max(1,Math.ceil(mx/bar-1e-9));
+  if(Math.abs(mx-nb*bar)>1e-6)warn.push("小節"+barNo+": 最長の行が "+mx+" 拍(1小節 = "+bar+" 拍)");
+  barNo+=nb;t0+=nb*bar;
+ });
+ return{ev,total:t0,bars:barNo-1,spq:15*bn/bpm,warn,bpm,bn};
+}
+const IDX7={C:0,D:1,E:2,F:3,G:4,A:5,B:6};
+const DYN={ppp:.25,pp:.35,p:.5,mp:.7,mf:1,f:1.4,ff:1.9,fff:2.6};
+const ordSL=['F','C','G','D','A','E','B'],ordFL=['B','E','A','D','G','C','F'];
+const symVal=c=>ACC[c]||0;
+function keyExpand(ln){
+ const m=/^#b=(.*)$/i.exec(ln);if(!m)return ln;
+ const cnt={p:0,n:0},out=[];
+ m[1].trim().split(/[\s,]+/).filter(Boolean).forEach(t=>{
+  if(/^[#♯♭'’.x]/.test(t)||/^(b+|d+|j+|ｷ+)$/.test(t)){
+   for(const c of t){const v=symVal(c);if(!v)continue;const L=v>0?ordSL[cnt.p++]:ordFL[cnt.n++];if(L)out.push(L+c)}
+  }else out.push(t)});
+ return '#b='+(out.join(' ')||m[1].trim());
+}
+let TUPID=0;
+function tupl(l){return l.replace(/\[([^\]]*)\](\d+)(?::(\d+))?/g,(m,inner,n,k)=>{n=+n;const kk=k?+k:Math.pow(2,Math.floor(Math.log2(n))),id=++TUPID;return inner.trim().split(/\s+/).map(t=>t+'\u00a7'+kk+'/'+n+'/'+id).join(' ')})}
+function parseScore(src){
+ let ts=[4,4],cur=[],cfg={ks:{},bn:4,bpm:120,key:'n',ts:[4,4]},later=null,bcfg=null,clefCh='G',off=0,grand=false,rsFlag=false,pendRe=0;const blocks=[],warn=[];
+ const setC=o=>{if(cur.length)later=Object.assign(later||{},o);else cfg=Object.assign({},cfg,o)};
+ const push=()=>{blocks.push({lines:cur,c:bcfg,rs:rsFlag,re:pendRe});rsFlag=false;pendRe=0;cur=[];if(later){cfg=Object.assign({},cfg,later);later=null}};
+ for(const raw of src.split('\n')){
+  let ln=raw.replace(/(\/\/|;).*$/,'').trim();let m;ln=keyExpand(ln);
+  {const mg=/^staff=(grand|2)$/i.exec(ln);if(mg){grand=true;continue}}
+  {const mt2=/^(\d+)\/(\d+)$/.exec(ln);if(mt2){ts=[+mt2[1],+mt2[2]];setC({ts});continue}}
+  {const mc=/^clef=(treble|alto|bass|G|C|F)$/i.exec(ln);if(mc){const c0=mc[1].toUpperCase();clefCh=c0==='TREBLE'?'G':c0==='ALTO'?'C':c0==='BASS'?'F':c0;off={G:0,C:6,F:12}[clefCh];continue}}
+  {const mr=/^:\|(?:\s*x?(\d+))?$/.exec(ln);
+   if(mr){const t=mr[1]?+mr[1]:2;if(cur.length){pendRe=t;push()}else if(blocks.length)blocks[blocks.length-1].re=t;continue}
+   if(ln==='|:'){if(cur.length)push();rsFlag=true;continue}}
+  if(!ln){if(cur.length)push();continue}
+  if(m=/^(\d+)\/(\d+)$/.exec(ln)){ts=[+m[1],+m[2]];continue}
+  if(m=/^(\d+)=(\d+(?:\.\d+)?)$/.exec(ln)){setC({bn:+m[1],bpm:+m[2]});continue}
+  if(m=/^#b=(.*)$/i.exec(ln)){const ks={},v=m[1].trim();if(v&&!/^n$/i.test(v))v.split(/[\s,]+/).forEach(t=>{const L=/[A-Ga-g]/.exec(t),s=parseNote(t);if(L&&s!==null){const l=L[0].toUpperCase();let d=((s-LV[l])%N+N)%N;if(d>N/2)d-=N;ks[l]=d}});setC({ks,key:v||'n'});continue}
+  if(!cur.length)bcfg=cfg;cur.push(ln);
+ }
+ if(cur.length)push();
+ let bar=4*ts[0]/ts[1];const H=N>>1,bl=[],blk=[];let t0=0,sT=0,barNo=1;const ev=[],marks=[],hairs=[];
+ blocks.forEach((B,bix)=>{
+  const c=B.c,ks=c.ks,spq=15*c.bn/c.bpm;let mx=0;bar=4*c.ts[0]/c.ts[1];const bT=t0,bS=sT,bB=barNo-1;
+  marks.push({t:t0,key:c.key,ks:c.ks,ts:c.ts,tempo:c.bn+'='+c.bpm});
+  B.lines.forEach((line,lix)=>{
+   let stf=0;{const mp=/^([LlRr]):\s*/.exec(line);if(mp){stf=/l/i.test(mp[1])?1:0;line=line.slice(mp[0].length)}}
+   let pos=0,oct=(grand&&stf?3:4),last=null,dyn=1,sf=false,hp=null,dl=null,ot=0,otl=null;const lineEvs=[];
+   const closeHp=tg=>{
+    if(!hp)return;
+    const evs=lineEvs.slice(hp.s);
+    if(evs.length){
+     const t=tg===null?(hp.type==='cre'?hp.m0*1.6:hp.m0*.55):tg;
+     evs.forEach((q,i)=>{q.vol=hp.m0+(t-hp.m0)*(i+1)/(evs.length+1)});
+     hairs.push({a:evs[0],b:evs[evs.length-1],type:hp.type});
+    }
+    hp=null};
+   for(let tok of tupl(line).split(/[\s|]+/).filter(Boolean)){
+    {const mo8=/^(8va|8vb|15ma|15mb|loco)$/i.exec(tok);if(mo8){const q=tok.toLowerCase();ot={'8va':1,'8vb':-1,'15ma':2,'15mb':-2,loco:0}[q];otl=q==='loco'?null:q;continue}}
+    if(DYN.hasOwnProperty(tok)){closeHp(DYN[tok]);dyn=DYN[tok];dl=tok;continue}
+    if(/^(sfz|sf|fz)$/i.test(tok)){sf=true;dl=tok.toLowerCase();continue}
+    if(/^(cre|cresc)$/i.test(tok)){closeHp(null);hp={type:'cre',m0:dyn,s:lineEvs.length};continue}
+    if(/^(dim|dec|decresc|dimin)$/i.test(tok)){closeHp(null);hp={type:'dim',m0:dyn,s:lineEvs.length};continue}
+    let tf=1,tid=0,tn=0;{const mt=/\u00a7(\d+)\/(\d+)\/(\d+)$/.exec(tok);if(mt){tok=tok.slice(0,mt.index);tf=+mt[1]/+mt[2];tn=+mt[2];tid=+mt[3]}}
+    let tie=false,stc=false,acn=false,ten=false,fer=false,trl=false,arp=false,gls=false,trm=0;while(/[~,!_@*\\]$/.test(tok)){const ch=tok.slice(-1);if(ch==='~')tie=true;else if(ch==='!')acn=true;else if(ch==='_')ten=true;else if(ch==='@')fer=true;else if(ch==='*')trl=true;else if(ch==='\\')gls=true;else stc=true;tok=tok.slice(0,-1)}if(tok[0]==='&'){arp=true;tok=tok.slice(1)}{const mq=/\/(\d)$/.exec(tok);if(mq){trm=+mq[1];tok=tok.slice(0,mq.index)}}
+    if(!tok){if(last&&tie)last.tie=true;continue}
+    const mo=/^o(\d)$/i.exec(tok);if(mo){oct=+mo[1];continue}
+    let body=tok,den=4,dot=false;
+    const md=/^(.*?)(\d+)(\.?)$/.exec(tok);
+    if(md){body=md[1];den=+md[2];dot=!!md[3]}
+    if(isNaN(den)){warn.push('音価が不正: '+tok);continue}
+    const wdur=(den===0?8:4/den)*(dot?1.5:1),dur=wdur*tf,bs={t:t0+pos,d:dur,wd:wdur,tid:tf!==1?tid:0,tn,ts:sT+pos*spq,ds:dur*spq};
+    if(/^r$/i.test(body)){ev.push({...bs,steps:[],notes:[],rest:1,vid:bix*100+lix,bk:bix,stf:grand?stf:0});last=null;pos+=dur;continue}
+    const steps=[],notes=[];let prev=null,bad=false;
+    body.split('-').forEach(nt=>{
+     const sh=/^[<>]*/.exec(nt)[0],nn=nt.slice(sh.length),s=scoreNote(nn,ks);
+     if(s===null||!nn){bad=true;return}
+     const sc=[...sh].reduce((a,c2)=>a+(c2==='>'?1:-1),0),L=nn[0].toUpperCase();
+     let a0;if(prev===null)a0=s+N*(oct-4);else{a0=s+N*Math.floor(prev/N);while(a0<=prev)a0+=N}
+     prev=a0+N*sc;steps.push(prev);
+     const d=(((s-LV[L]+H)%N)+N)%N-H,k=Math.round((prev-d-LV[L])/N);
+     notes.push({pos:(4+k)*7+IDX7[L]+(grand&&stf?12:off)-7*ot,acc:nn.length>1?nn.slice(1).replace(/n/g,'♮'):''});
+    });
+    if(bad){warn.push('読み取れない: '+tok);pos+=dur;continue}
+    const e0={...bs,steps,notes,vol:dyn,sf,dl};sf=false;dl=null;
+    if(last&&last.tie){e0.from=last;if(last.steps.length===steps.length&&last.steps.every((v,i)=>v===steps[i])){e0.kind='tie';const h=last.head||last;h.ds+=e0.ds;e0.head=h;e0.silent=1}else{e0.kind='slur';last.legato=1}}
+    e0.tie=tie;e0.stc=stc;e0.acn=acn;e0.ten=ten;e0.fer=fer;e0.trl=trl;e0.arp=arp;e0.gl=gls;e0.trm=trm;if(last&&last.gl){last.glTo=e0.steps[0];last.glEv=e0}e0.ol=otl;otl=null;e0.vid=bix*100+lix;e0.bk=bix;e0.stf=grand?stf:0;ev.push(e0);last=e0;lineEvs.push(e0);pos+=dur;
+   }
+   closeHp(null);
+   mx=Math.max(mx,pos);
+  });
+  const nb=Math.max(1,Math.ceil(mx/bar-1e-9));
+  if(Math.abs(mx-nb*bar)>1e-6)warn.push('小節'+barNo+': 最長の行が '+(+mx.toFixed(3))+' 拍(1小節 = '+bar+' 拍)');
+  for(let i=0;i<nb;i++)bl.push({s:t0+i*bar,l:bar});barNo+=nb;t0+=nb*bar;sT+=nb*bar*spq;blk.push({s0:bS,s1:sT,b0:bB,b1:barNo-1,rs:B.rs,re:B.re});
+ });
+ return{ev,marks,hairs,clefCh,grand,bl,blk,ts:blocks.length?blocks[0].c.ts:ts,bar,bars:barNo-1,secTotal:sT,warn};
+}
+function scoreInfo(){
+ const r=parseScore($('score').value);
+ $('sinfo').innerHTML=r.bars+' 小節 / '+r.secTotal.toFixed(1)+' 秒'+(r.warn.length?'<br>⚠ '+r.warn.join('<br>⚠ '):'');
+ drawScore(r);return r;
+}
+function playScore(){
+ stopScore();const r=scoreInfo();
+ ac=ac||new(window.AudioContext||window.webkitAudioContext)();ac.resume();
+ const T0=ac.currentTime+.1;
+ expandEv(repeatEv(r)).forEach(e=>e.silent?0:e.steps.forEach(a=>{
+  const o=ac.createOscillator(),g=ac.createGain();TB=e.stf?TBL:TBU;tim(o);o.frequency.value=hz(a);
+  const s=T0+e.ts,d=Math.max(.06,e.ds*(e.stc&&e.ten?.7:e.stc?.4:e.fer?1.8:(e.legato||e.ten)?1:.95)),v=Math.min(.8,.2*(e.vol||1)*(e.acn?1.7:1)*(e.sf?2.2:1)/Math.sqrt(e.steps.length));
+  {const A=Math.min(TB.a,d*.5);g.gain.setValueAtTime(0,s);g.gain.linearRampToValueAtTime(v,s+A);g.gain.exponentialRampToValueAtTime(Math.max(.001,v*TB.s),s+Math.max(A+.01,d-.05));g.gain.exponentialRampToValueAtTime(.001,s+d)}
+  if(e.glTo!==undefined&&a===e.steps[0]){o.frequency.setValueAtTime(hz(a),s);o.frequency.exponentialRampToValueAtTime(hz(e.glTo),s+d)}o.connect(g).connect(ac.destination);o.start(s);o.stop(s+d+.02);playing.push(o);
+ }));
+}
+function texEsc(t){return t.replace(/[\\{}$&#%_^~]/g,c=>({'\\':'\\textbackslash{}','^':'\\^{}','~':'\\~{}'}[c]||'\\'+c)).replace(/♮/g,'$\\natural$').replace(/♭/g,'$\\flat$').replace(/♯/g,'$\\sharp$').replace(/♩/g,'4').replace(/⚠/g,'')}
+function toLatex(){
+ const sv=$('sheet').querySelector('svg');if(!sv)return '';
+ const f=n=>Math.round(n*100)/100,P=(x,y)=>`(${f(x)},${f(-y)})`,A=(e,k,d)=>{const v=e.getAttribute(k);return v===null?d:v};
+ let out='';
+ for(const e of sv.children){
+  const t=e.tagName.toLowerCase(),op=A(e,'opacity',null);
+  if(t==='line')out+=`\\draw[line width=${A(e,'stroke-width','1')}pt${op?',opacity='+op:''}] ${P(+A(e,'x1'),+A(e,'y1'))} -- ${P(+A(e,'x2'),+A(e,'y2'))};\n`;
+  else if(t==='rect'){const x=+A(e,'x'),y=+A(e,'y');out+=`\\fill ${P(x,y)} rectangle ${P(x+(+A(e,'width')),y+(+A(e,'height')))};\n`}
+  else if(t==='circle')out+=`\\fill ${P(+A(e,'cx'),+A(e,'cy'))} circle (${A(e,'r')}pt);\n`;
+  else if(t==='ellipse'){const cx=+A(e,'cx'),cy=+A(e,'cy');out+=`\\draw[rotate around={20:${P(cx,cy)}},line width=${A(e,'stroke-width','1')}pt${A(e,'fill')!=='none'?',fill=black':''}] ${P(cx,cy)} ellipse (${A(e,'rx')}pt and ${A(e,'ry')}pt);\n`}
+  else if(t==='path'){
+   const re=/([MlQq])([^MlQq]*)/g;let m,cx=0,cy=0,s='';
+   while(m=re.exec(A(e,'d'))){
+    const n=m[2].trim().split(/[\s,]+/).filter(Boolean).map(Number);
+    if(m[1]==='M'){cx=n[0];cy=n[1];s+=P(cx,cy)}
+    else if(m[1]==='l'){cx+=n[0];cy+=n[1];s+=' -- '+P(cx,cy)}
+    else{let qx,qy,ex,ey;if(m[1]==='Q'){qx=n[0];qy=n[1];ex=n[2];ey=n[3]}else{qx=cx+n[0];qy=cy+n[1];ex=cx+n[2];ey=cy+n[3]}
+     s+=` .. controls ${P(cx+2/3*(qx-cx),cy+2/3*(qy-cy))} and ${P(ex+2/3*(qx-ex),ey+2/3*(qy-ey))} .. ${P(ex,ey)}`;cx=ex;cy=ey}
+   }
+   out+=`\\draw[line width=${A(e,'stroke-width','1')}pt] ${s};\n`;
+  }
+  else if(t==='text'){
+   const an=A(e,'text-anchor','start'),fs=A(e,'font-size','10'),anc=an==='middle'?'base':an==='end'?'base east':'base west';
+   out+=`\\node[anchor=${anc},inner sep=0${op?',opacity='+op:''}] at ${P(+A(e,'x'),+A(e,'y'))} {\\fontsize{${fs}}{${fs}}\\selectfont ${A(e,'font-style','')==='italic'?'\\itshape ':''}${A(e,'font-weight','')==='700'?'\\bfseries ':''}${texEsc(e.textContent)}};\n`;
+  }
+ }
+ return '\\documentclass[border=8pt]{standalone}\n\\usepackage{tikz}\n\\begin{document}\n\\begin{tikzpicture}[x=1pt,y=1pt,line cap=round]\n'+out+'\\end{tikzpicture}\n\\end{document}\n';
+}
+$('stex').onclick=()=>{scoreInfo();$('tex').value=toLatex();$('tex').style.display='block'};
+$('scopy').onclick=()=>{$('tex').style.display='block';$('tex').select();const t=$('tex').value;try{navigator.clipboard.writeText(t).catch(()=>document.execCommand('copy'))}catch(e){document.execCommand('copy')}};
+const AW={S:9,F:7,HS:7,HF:7,N:6,U:6,D:6,SS:14,SF:14,X:10,DF:13};
+function accKind(c){return c==='♮'?'N':(KIND[c]||KIND[{'♯':'#','♭':'b','’':"'",'ｷ':'j'}[c]]||c)}
+const accList=a=>{const k=[...a].map(accKind),o=[];for(let i=0;i<k.length;i++){const p=k[i]+'|'+k[i+1];if(p==='HS|S'||p==='S|HS'){o.push('SS');i++}else if(p==='HF|F'||p==='F|HF'){o.push('SF');i++}else if(p==='S|S'){o.push('X');i++}else if(p==='F|F'){o.push('DF');i++}else o.push(k[i])}return o};
+const accW=a=>accList(a).reduce((t,k)=>t+(AW[k]||7)+1,0);
+function accG(a,xr,y){
+ const PR={X:6,DF:6,SS:5,SF:5,S:4,F:4,N:4,HS:3,HF:3,U:1,D:1},ks=accList(a).map((k,i)=>[k,i]).sort((p,q)=>(PR[p[0]]||0)-(PR[q[0]]||0)||p[1]-q[1]).map(p=>p[0]),tot=ks.reduce((t,k)=>t+(AW[k]||7)+1,0);let x=xr-tot,o='';
+ const st=`stroke='currentColor' stroke-width='1.3' fill='none'`;
+ const L=(x1,y1,x2,y2)=>`<line x1='${x1}' y1='${y1}' x2='${x2}' y2='${y2}' ${st}/>`;
+ ks.forEach(k=>{const w=AW[k]||7,c=x+w/2;
+  if(k==='S')o+=L(c-2.5,y-9,c-2.5,y+9)+L(c+2.5,y-10,c+2.5,y+8)+L(c-4.5,y-2.5,c+4.5,y-4.5)+L(c-4.5,y+3.5,c+4.5,y+1.5);
+  else if(k==='X')o+=`<path d='M${c-3.5} ${y-3.5} L${c+3.5} ${y+3.5} M${c-3.5} ${y+3.5} L${c+3.5} ${y-3.5}' stroke='currentColor' stroke-width='2.2' fill='none'/><rect x='${c-5}' y='${y-5}' width='3' height='3' fill='currentColor'/><rect x='${c+2}' y='${y-5}' width='3' height='3' fill='currentColor'/><rect x='${c-5}' y='${y+2}' width='3' height='3' fill='currentColor'/><rect x='${c+2}' y='${y+2}' width='3' height='3' fill='currentColor'/>`;
+  else if(k==='DF')o+=L(c-4.5,y-11,c-4.5,y+4)+`<path d='M${c-4.5} ${y+4} C${c+2} ${y+1} ${c+2} ${y-6} ${c-4.5} ${y-3}' ${st}/>`+L(c+1.5,y-11,c+1.5,y+4)+`<path d='M${c+1.5} ${y+4} C${c+8} ${y+1} ${c+8} ${y-6} ${c+1.5} ${y-3}' ${st}/>`;
+  else if(k==='SS')o+=L(c-4.5,y-9,c-4.5,y+9)+L(c,y-10,c,y+9)+L(c+4.5,y-10,c+4.5,y+8)+L(c-6.5,y-2.5,c+6.5,y-4.5)+L(c-6.5,y+3.5,c+6.5,y+1.5);
+  else if(k==='SF')o+=L(c,y-11,c,y+4)+`<path d='M${c} ${y+4} C${c+8} ${y+1} ${c+8} ${y-6} ${c} ${y-3}' ${st}/>`+`<path d='M${c} ${y+4} C${c-8} ${y+1} ${c-8} ${y-6} ${c} ${y-3}' ${st}/>`;
+  else if(k==='HS')o+=L(c,y-9,c,y+9)+L(c-3.5,y-2.5,c+3.5,y-4.5)+L(c-3.5,y+3.5,c+3.5,y+1.5);
+  else if(k==='F')o+=L(c-2,y-11,c-2,y+4)+`<path d='M${c-2} ${y+4} C${c+6} ${y+1} ${c+6} ${y-6} ${c-2} ${y-3}' ${st}/>`;
+  else if(k==='HF')o+=L(c+2,y-11,c+2,y+4)+`<path d='M${c+2} ${y+4} C${c-6} ${y+1} ${c-6} ${y-6} ${c+2} ${y-3}' ${st}/>`;
+  else if(k==='N')o+=L(c-2.5,y-9,c-2.5,y+4)+L(c+2.5,y-4,c+2.5,y+9)+L(c-2.5,y-3,c+2.5,y-4.5)+L(c-2.5,y+3.5,c+2.5,y+2);
+  else if(k==='U')o+=L(c,y+5,c,y-5)+L(c-2.5,y-2.5,c,y-5)+L(c+2.5,y-2.5,c,y-5);
+  else if(k==='D')o+=L(c,y-5,c,y+5)+L(c-2.5,y+2.5,c,y+5)+L(c+2.5,y+2.5,c,y+5);
+  else o+=`<text x='${c}' y='${y+3}' fill='currentColor' font-size='10' text-anchor='middle'>${k}</text>`;
+  x+=w+1});
+ return o;
+}
+function drawScore(r){
+ const bst=r.bl.map(b=>b.s),bOf=t=>{let i=0;while(i+1<bst.length&&bst[i+1]<=t+1e-6)i++;return i},fOf=(t,bi)=>(t-bst[bi])/r.bl[bi].l;
+ const cntB={};r.ev.forEach(e=>{const b=bOf(e.t);(cntB[b]=cntB[b]||new Set()).add(Math.round(e.t*1000))});const mxo=Math.max(0,...Object.values(cntB).map(x=>x.size)),sp=8,mw=Math.max(190,mxo*15+60),per=Math.max(1,Math.min(4,Math.floor(760/mw))),left=64,K=r.grand?2:1,gap=105,rowH=r.grand?275:130,M=Math.max(1,r.bars),rows=Math.ceil(M/per);
+ const W=left+Math.min(M,per)*mw+12,Hh=rows*rowH+16,yb=row=>Math.floor(row/K)*rowH+(row%K)*gap+80,Y=(row,p)=>yb(row)-(p-30)*sp/2;
+ let s=`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${W} ${Hh}' width='${W}' style='color:var(--fg);font-family:serif'>`;
+ const T=(x,y,t,a)=>`<text x='${x}' y='${y}' fill='currentColor' ${a||''}>${t}</text>`;
+ for(let sys=0;sys<rows;sys++)for(let st=0;st<K;st++){
+  const row=sys*K+st,n=Math.min(per,M-sys*per),top=yb(row)-4*sp;
+  for(let i=0;i<5;i++)s+=`<line x1='${left-56}' x2='${left+n*mw}' y1='${top+i*sp}' y2='${top+i*sp}' stroke='currentColor' stroke-width='.8' opacity='.55'/>`;
+  if(K===2&&st===0){const bt=yb(row+1),md=(top+bt)/2;s+=`<path d='M${left-57} ${top} C${left-63} ${top+30} ${left-58} ${md-12} ${left-62} ${md} C${left-58} ${md+12} ${left-63} ${bt-30} ${left-57} ${bt}' stroke='currentColor' stroke-width='2' fill='none'/>`}
+  const cch=K===2?(st?'F':'G'):(r.clefCh||'G');s+=T(left-54,top+({G:3,C:2,F:1}[cch])*sp+5,cch,`font-size='26' font-style='italic' font-weight='700'`);
+  if(sys===0)s+=T(left-22,top+sp+3,r.ts[0],`font-size='14' font-weight='700' text-anchor='middle'`)+T(left-22,top+3*sp+3,r.ts[1],`font-size='14' font-weight='700' text-anchor='middle'`);
+  for(let i=0;i<=n;i++){const x=left+i*mw;
+   s+=`<line x1='${x}' x2='${x}' y1='${top}' y2='${K===2&&st===0?yb(row+1):top+4*sp}' stroke='currentColor' stroke-width='${sys*per+i===M?2.5:1}'/>`;
+   if(i<n&&st===0)s+=T(x+2,top-4,sys*per+i+1,`font-size='8' opacity='.6'`)}
+ }
+ const ordS=['F','C','G','D','A','E','B'],ordF=['B','E','A','D','G','C','F'];
+ const posS={F:38,C:35,G:39,D:36,A:33,E:37,B:34},posF={B:34,E:37,A:33,D:36,G:32,C:35,F:31};
+ const toAcc=d=>{let a='',q=Math.abs(d);Object.entries(ACC).filter(([c,v])=>/^[#bxjd'.]$/.test(c)&&(d>0?v>0:v<0)).map(([c,v])=>[c,Math.abs(v)]).sort((p,r)=>r[1]-p[1]).forEach(([c,v])=>{while(q>=v){a+=c;q-=v}});return a};
+ const keyAt=bi=>{let m=null;r.marks.forEach(k=>{if(bOf(k.t)<=bi)m=k});return m};
+ const ksList=m=>{const o=[];if(!m||!m.ks)return o;
+  ordS.forEach(L=>{const d=m.ks[L];if(d>0)o.push({pos:posS[L],acc:toAcc(d)})});
+  ordF.forEach(L=>{const d=m.ks[L];if(d<0)o.push({pos:posF[L],acc:toAcc(d)})});
+  return o};
+ const ksW=[],ksDraw=[];
+ for(let bi=0;bi<M;bi++){
+  const m=keyAt(bi),lst=ksList(m),first=m&&bOf(m.t)===bi;
+  if(lst.length&&(first||bi%per===0)){ksW[bi]=lst.reduce((t,q)=>t+accW(q.acc)+3,0)+4;ksDraw.push({bi,lst})}
+ }
+ ksDraw.forEach(({bi,lst})=>{
+  for(let st=0;st<K;st++){const row=Math.floor(bi/per)*K+st;let x=left+(bi%per)*mw+4;
+  lst.forEach(q=>{x+=accW(q.acc);s+=accG(q.acc,x,Y(row,q.pos-(st?2:0)));x+=3})}
+ });
+ (r.blk||[]).forEach(B=>{
+  const dots=(x,row)=>{const tp=yb(row)-4*sp;return `<circle cx='${x}' cy='${tp+1.5*sp}' r='1.8' fill='currentColor'/><circle cx='${x}' cy='${tp+2.5*sp}' r='1.8' fill='currentColor'/>`};
+  const ln2=(x,row,w)=>{const tp=yb(row)-4*sp;return `<line x1='${x}' x2='${x}' y1='${tp}' y2='${tp+4*sp}' stroke='currentColor' stroke-width='${w}'/>`};
+  if(B.rs&&B.b0<M){for(let st=0;st<K;st++){const row=Math.floor(B.b0/per)*K+st,x=left+(B.b0%per)*mw;s+=ln2(x+2,row,3.5)+ln2(x+7,row,1)+dots(x+12,row)}}
+  if(B.re&&B.b1>0&&B.b1-1<M){for(let st=0;st<K;st++){const bi=B.b1-1,row=Math.floor(bi/per)*K+st,x=left+(bi%per+1)*mw;s+=dots(x-12,row)+ln2(x-7,row,1)+ln2(x-2,row,3.5);if(B.re>2&&st===0)s+=T(x-22,yb(row)-4*sp-4,'\u00d7'+B.re,`font-size='10' font-weight='700'`)}}
+ });
+ const bgs=[],cb={};
+ const flushB=v=>{const g=cb[v];if(g&&g.m.length>1){g.m.forEach(q=>q.bm=g.m);bgs.push(g.m)}delete cb[v]};
+ r.ev.forEach(e=>{
+  const bs0=Math.pow(2,Math.floor(Math.log2(e.wd||e.d)+1e-9)),v=e.vid,bt=Math.floor(e.t-bst[bOf(e.t)]+1e-6),bi0=bOf(e.t),g=cb[v];
+  if(!e.rest&&bs0<1){
+   if(g&&g.bt===bt&&g.bi===bi0&&Math.abs(g.end-e.t)<1e-6){g.m.push(e);g.end=e.t+e.d}
+   else{flushB(v);cb[v]={bt,bi:bi0,end:e.t+e.d,m:[e]}}
+  }else flushB(v);
+ });
+ Object.keys(cb).forEach(flushB);
+ const padBar=[];
+ r.ev.forEach(e=>{
+  if(e.rest||!e.notes.length)return;
+  const bi=bOf(e.t);if(bi>=M)return;
+  const fr=fOf(e.t,bi);if(fr>.9)return;
+  const ns2=e.notes.slice().sort((a,b)=>a.pos-b.pos),w=Math.max(0,...ns2.map(n=>accW(n.acc)));
+  if(!w)return;
+  const L0=5+w+(ns2.filter(n=>n.acc).length>1?w+3:0)+6,k=ksW[bi]||0,need=(L0-22-fr*(mw-40-k))/(1-fr);
+  padBar[bi]=Math.min(Math.max(padBar[bi]||0,need),(mw-40-k)*.55);
+ });
+ let pk=null,pt=null,pts=null;
+ r.marks.forEach(mk=>{
+  const bi=bOf(mk.t);if(bi>=M)return;
+  const row=Math.floor(bi/per)*K,x=left+(bi%per)*mw+3,top=yb(row)-4*sp,tp=mk.tempo.split('=');
+  let lab='';if(mk.tempo!==pt)lab+=(tp[0]==='4'?'♩':tp[0])+'='+tp[1]+'  ';if(mk.key!==pk)lab+='#b='+mk.key;if(pts&&mk.ts&&(mk.ts[0]!==pts[0]||mk.ts[1]!==pts[1]))lab+='  '+mk.ts[0]+'/'+mk.ts[1];
+  if(lab)s+=T(x,top-16,lab,`font-size='10' font-weight='700'`);pk=mk.key;pt=mk.tempo;pts=mk.ts;
+ });
+ r.ev.forEach(e=>{
+  const bi=bOf(e.t);if(bi>=M)return;
+  let row=Math.floor(bi/per)*K+(e.stf||0),x=left+(bi%per)*mw+26+(ksW[bi]||0)+(padBar[bi]||0)+(fOf(e.t,bi))*(mw-40-(ksW[bi]||0)-(padBar[bi]||0));
+  const dur=e.wd||e.d,bs=Math.pow(2,Math.floor(Math.log2(dur)+1e-9)),dot=dur>bs+1e-9;
+  if(e.rest){e.px={row,x,hi:34,lo:34,ns:[],up:false};const y=Y(row,bs>=4?36:34);
+   if(bs>=8)s+=`<rect x='${x-3}' y='${y}' width='6' height='${sp}' fill='currentColor'/>`;else if(bs>=4)s+=`<rect x='${x-5}' y='${y}' width='10' height='4' fill='currentColor'/>`;
+   else if(bs>=2)s+=`<rect x='${x-5}' y='${y-4}' width='10' height='4' fill='currentColor'/>`;
+   else if(bs>=1)s+=`<path d='M${x-2} ${y-10} l5 5 l-5 5 l5 5' stroke='currentColor' stroke-width='2' fill='none'/>`;
+   else{const n=Math.round(-Math.log2(bs));s+=`<line x1='${x+4}' y1='${y-10}' x2='${x-4}' y2='${y+10}' stroke='currentColor' stroke-width='1.6'/>`;for(let i=0;i<n;i++)s+=`<circle cx='${x-1-i*1.6}' cy='${y-6+i*5}' r='1.9' fill='currentColor'/>`}
+   if(dot)s+=`<circle cx='${x+9}' cy='${Y(row,34)}' r='1.6' fill='currentColor'/>`;
+   return}
+  const ns=e.notes.slice().sort((a,b)=>a.pos-b.pos),lo=ns[0].pos,hi=ns[ns.length-1].pos;const wmx=Math.max(0,...ns.map(n=>accW(n.acc)));
+  {const L0=wmx?5+wmx+(ns.filter(n=>n.acc).length>1?wmx+3:0)+6:0;x=Math.max(x,left+(bi%per)*mw+(ksW[bi]||0)+L0+4)}
+  e.px={row,x,hi,lo,ns,up:(lo+hi)/2<34};
+  if(e.dl)s+=T(x-6,yb(row)+22,e.dl,`font-size='12' font-style='italic' font-weight='700'`);
+  const led=p=>`<line x1='${x-9}' x2='${x+9}' y1='${Y(row,p)}' y2='${Y(row,p)}' stroke='currentColor'/>`;
+  for(let p=28;p>=lo;p-=2)s+=led(p);
+  for(let p=40;p<=hi;p+=2)s+=led(p);
+  let pp=-9,po=false,ai=0;
+  ns.forEach((nt,i)=>{
+   const off=nt.pos-pp===1&&!po;po=off;pp=nt.pos;
+   const cx=x+(off?9:0),cy=Y(row,nt.pos);
+   s+=`<ellipse cx='${cx}' cy='${cy}' rx='5' ry='3.6' transform='rotate(-20 ${cx} ${cy})' fill='${bs>=2?'none':'currentColor'}' stroke='currentColor' stroke-width='1.2'/>`;
+   if(nt.acc)s+=accG(nt.acc,x-5-((ai++)%2)*(wmx+3),cy);
+   if(dot)s+=`<circle cx='${cx+9}' cy='${cy-(nt.pos%2===0?sp/2:0)}' r='1.6' fill='currentColor'/>`;
+  });
+  const acL=wmx?5+wmx+(ns.filter(n=>n.acc).length>1?wmx+3:0):0,topY=Math.min(Y(row,hi)-14,yb(row)-4*sp-6);
+  if(e.ol)s+=T(x-8,yb(row)-4*sp-8,e.ol,`font-size='10' font-style='italic'`);
+  if(e.trl)s+=T(x-6,topY,'tr',`font-size='12' font-style='italic' font-weight='700'`);
+  if(e.fer)s+=`<path d='M${x-8} ${topY+3} Q${x} ${topY-9} ${x+8} ${topY+3}' stroke='currentColor' stroke-width='1.4' fill='none'/><circle cx='${x}' cy='${topY}' r='1.6' fill='currentColor'/>`;
+  if(e.arp){let d='M'+(x-acL-8)+' '+(Y(row,lo)+4);for(let yy=Y(row,lo)+4,i=0;yy>Y(row,hi)-4;yy-=4,i++)d+=' L'+(x-acL-8+(i%2?2:-2))+' '+(yy-4);s+=`<path d='${d}' stroke='currentColor' stroke-width='1.2' fill='none'/>`}
+  if(e.ten){const u4=(lo+hi)/2<34,yt=(u4?Y(row,lo)+9:Y(row,hi)-9)+(e.stc?(u4?6:-6):0);s+=`<line x1='${x-4}' x2='${x+4}' y1='${yt}' y2='${yt}' stroke='currentColor' stroke-width='1.4'/>`}
+  if(e.stc){const u2=(lo+hi)/2<34;s+=`<circle cx='${x}' cy='${u2?Y(row,lo)+9:Y(row,hi)-9}' r='1.7' fill='currentColor'/>`}
+  if(e.acn){const u3=(lo+hi)/2<34,ya=(u3?Y(row,lo)+12:Y(row,hi)-12)+(e.stc?(u3?7:-7):0);s+=`<path d='M${x-5} ${ya-3.5} L${x+5} ${ya} L${x-5} ${ya+3.5}' stroke='currentColor' stroke-width='1.3' fill='none'/>`}
+  if(bs<4&&!e.bm){
+   const up=(lo+hi)/2<34,sx=up?x+4.7:x-4.7,y1=Y(row,up?lo:hi),y2=Y(row,up?hi:lo)+(up?-1:1)*(28+Math.max(0,(bs<1?Math.round(-Math.log2(bs)):0)-2)*5);
+   s+=`<line x1='${sx}' x2='${sx}' y1='${y1}' y2='${y2}' stroke='currentColor' stroke-width='1.2'/>`;
+   const fl=bs<1?Math.round(-Math.log2(bs)):0,g=up?1:-1;
+   for(let i=0;i<fl;i++)s+=`<path d='M${sx} ${y2+g*i*5} q8 ${g*5} 5 ${g*13}' stroke='currentColor' stroke-width='1.4' fill='none'/>`;
+  }
+ });
+ r.ev.forEach(e=>{
+  const a=e.from;if(!a||!a.px||!e.px)return;
+  const pa=a.px,pb=e.px,tie=e.kind==='tie';
+  const arc=(x1,y1,x2,y2,d)=>`<path d='M${x1} ${y1} Q${(x1+x2)/2} ${Math.min(y1,y2)+d*10} ${x2} ${y2}' stroke='currentColor' stroke-width='1.3' fill='none'/>`;
+  const one=(ya,yb2,d)=>{
+   if(pa.row===pb.row)s+=arc(pa.x+6,ya,pb.x-6,yb2,d);
+   else{s+=arc(pa.x+6,ya,left+Math.min(per,M-Math.floor(pa.row/K)*per)*mw-4,ya,d);s+=arc(left+6,yb2,pb.x-6,yb2,d)}
+  };
+  if(tie){const d=pb.up?1:-1;pb.ns.forEach(n=>{const y=Y(pb.row,n.pos)+d*6;one(Y(pa.row,n.pos)+d*6,y,d)})}
+  else one(Y(pa.row,pa.hi)-(pa.up?32:8),Y(pb.row,pb.hi)-(pb.up?32:8),-1);
+ });
+ r.ev.forEach(e=>{
+  if(e.trm&&e.px&&!e.rest){const p=e.px,sx=p.x+(p.up?4.7:-4.7),y=p.up?Y(p.row,p.hi)-14:Y(p.row,p.lo)+14;
+   for(let k=0;k<e.trm;k++){const yy=y+(k-(e.trm-1)/2)*4;s+=`<line x1='${sx-4}' x2='${sx+4}' y1='${yy+2}' y2='${yy-2}' stroke='currentColor' stroke-width='2.2'/>`}}
+  if(e.gl&&e.glEv&&e.px&&e.glEv.px&&e.px.row===e.glEv.px.row){const a=e.px,b=e.glEv.px,ya=Y(a.row,(a.lo+a.hi)/2),y2=Y(b.row,(b.lo+b.hi)/2);
+   s+=`<line x1='${a.x+8}' y1='${ya}' x2='${b.x-8}' y2='${y2}' stroke='currentColor' stroke-width='1.2'/>`+T((a.x+b.x)/2-12,Math.min(ya,y2)-8,'gliss.',`font-size='9' font-style='italic'`)}
+ });
+ const tgs={};
+ r.ev.forEach(e=>{if(e.tid&&e.px){const k=e.vid+'/'+e.tid;(tgs[k]=tgs[k]||[]).push(e)}});
+ Object.values(tgs).forEach(g=>{
+  const ps=g.map(q=>q.px),row=ps[0].row,nts=g.filter(q=>!q.rest);
+  if(!nts.length||ps.some(p=>p.row!==row))return;
+  const up=nts.reduce((a,q)=>a+(q.px.lo+q.px.hi)/2,0)/nts.length<34;
+  const beamed=nts.length===g.length&&nts.every(q=>q.bm&&q.bm===nts[0].bm);
+  const x1=ps[0].x-5,x2=ps[ps.length-1].x+6,xm=(x1+x2)/2,dd=up?-1:1;
+  let y=up?Math.min(...nts.map(q=>Y(row,q.px.hi)))-36:Math.max(...nts.map(q=>Y(row,q.px.lo)))+36;
+  y=up?Math.min(y,yb(row)-4*sp-8):Math.max(y,yb(row)+10);
+  s+=T(xm,y+(up?-2:10),g[0].tn,`font-size='11' font-style='italic' font-weight='700' text-anchor='middle'`);
+  if(!beamed)s+=`<path d='M${x1} ${y-dd*5} L${x1} ${y} L${xm-7} ${y} M${xm+7} ${y} L${x2} ${y} L${x2} ${y-dd*5}' stroke='currentColor' stroke-width='1.1' fill='none'/>`;
+ });
+ bgs.forEach(g=>{
+  const ps=g.map(q=>q.px);if(ps.some(p=>!p))return;
+  const row=ps[0].row,up=ps.reduce((a,p)=>a+(p.lo+p.hi)/2,0)/ps.length<34,dn=up?-1:1;
+  const tip=up?Math.min(...ps.map(p=>Y(row,p.hi)))-28:Math.max(...ps.map(p=>Y(row,p.lo)))+28;
+  const sx=ps.map(p=>p.x+(up?4.7:-4.7)),nn=g.map(q=>Math.round(-Math.log2(Math.pow(2,Math.floor(Math.log2(q.wd||q.d)+1e-9))))),nmax=Math.max(...nn);
+  ps.forEach((p,i)=>{s+=`<line x1='${sx[i]}' x2='${sx[i]}' y1='${Y(row,up?p.lo:p.hi)}' y2='${tip}' stroke='currentColor' stroke-width='1.2'/>`});
+  for(let L=1;L<=nmax;L++){
+   const yy=tip-dn*(L-1)*5;
+   for(let i=0;i<g.length;i++){
+    if(nn[i]<L)continue;
+    let j=i;while(j+1<g.length&&nn[j+1]>=L)j++;
+    if(j>i)s+=`<line x1='${sx[i]}' x2='${sx[j]}' y1='${yy}' y2='${yy}' stroke='currentColor' stroke-width='3.2'/>`;
+    else{const a=i===g.length-1?sx[i]-7:sx[i],b=i===g.length-1?sx[i]:sx[i]+7;s+=`<line x1='${a}' x2='${b}' y1='${yy}' y2='${yy}' stroke='currentColor' stroke-width='3.2'/>`}
+    i=j;
+   }
+  }
+ });
+ (r.hairs||[]).forEach(h=>{
+  const pa=h.a.px,pb=h.b.px;if(!pa||!pb)return;
+  const wedge=(row,x1,x2)=>{const y=yb(row)+34,d=h.type==='cre'?`M${x2} ${y-5} L${x1} ${y} L${x2} ${y+5}`:`M${x1} ${y-5} L${x2} ${y} L${x1} ${y+5}`;s+=`<path d='${d}' stroke='currentColor' stroke-width='1.2' fill='none'/>`};
+  if(pa.row===pb.row)wedge(pa.row,pa.x-4,pb.x+4);
+  else{wedge(pa.row,pa.x-4,left+Math.min(per,M-Math.floor(pa.row/K)*per)*mw-4);wedge(pb.row,left+6,pb.x+4)}
+ });
+ $('sheet').innerHTML=s+'</svg>';
+}
+let playing=[];
+function scoreInfoOld(){
+ const r=parseScore($("score").value);
+ $("sinfo").innerHTML=r.bars+" 小節 / "+(r.total*r.spq).toFixed(1)+" 秒 / "+r.bn+"="+r.bpm+(r.warn.length?"<br>⚠ "+r.warn.join("<br>⚠ "):"");
+ return r;
+}
+function stopScore(){playing.forEach(o=>{try{o.stop()}catch(e){}});playing=[]}
+function playScoreOld(){
+ stopScore();const r=scoreInfo();
+ ac=ac||new(window.AudioContext||window.webkitAudioContext)();ac.resume();
+ const T=ac.currentTime+.1;
+ r.ev.forEach(e=>e.steps.forEach(a=>{
+  const o=ac.createOscillator(),g=ac.createGain();tim(o);o.frequency.value=hz(a);
+  const s=T+e.t*r.spq,d=Math.max(.06,e.d*r.spq*.95),v=.2/Math.sqrt(e.steps.length);
+  {const A=Math.min(TB.a,d*.5);g.gain.setValueAtTime(0,s);g.gain.linearRampToValueAtTime(v,s+A);g.gain.exponentialRampToValueAtTime(Math.max(.001,v*TB.s),s+Math.max(A+.01,d-.05));g.gain.exponentialRampToValueAtTime(.001,s+d)}
+  if(e.glTo!==undefined&&a===e.steps[0]){o.frequency.setValueAtTime(hz(a),s);o.frequency.exponentialRampToValueAtTime(hz(e.glTo),s+d)}o.connect(g).connect(ac.destination);o.start(s);o.stop(s+d+.02);playing.push(o);
+ }));
+}
+$("score").value="4/4\n4=120\n#b=n\n\nC-E.-G2 C-E-G2\no5 C4 E.4 G4 E4\n\nC-F-A.2 F-A.-C2\no5 F2 A.2";
+$("score").oninput=scoreInfo;$("splay").onclick=playScore;$("sstop").onclick=stopScore;$("spdf").onclick=()=>window.print();
+function stepTable(){
+ const odd=n=>{while(n%2===0)n/=2;return n},g=(a,b)=>b?g(b,a%b):a;
+ let h='<tr><th>Step</th><th>Cent</th><th>音名</th><th>別名</th><th>近い純正比(誤差 c)</th></tr>';
+ for(let s=0;s<=N;s++){
+  const c=s===N?1200:cc(s),nm=names(s%N),cand=[];
+  for(let q=1;q<=64;q++)for(let p=q;p<=2*q;p++){
+   if(g(p,q)!==1)continue;const lim=Math.max(odd(p),odd(q));if(lim>49)continue;
+   const er=c-1200*Math.log2(p/q);if(Math.abs(er)<=8)cand.push({r:p+'/'+q,er,lim});
+  }
+  cand.sort((a,b)=>a.lim-b.lim||Math.abs(a.er)-Math.abs(b.er));
+  h+=`<tr><td>${s}</td><td>${c.toFixed(1)}</td><td><b>${s===N?nm[0]+' (8ve)':nm[0]}</b></td><td>${nm.slice(1).join(' = ')}</td><td style='text-align:left'>${cand.slice(0,3).map(x=>x.r+' ('+(x.er>=0?'+':'')+x.er.toFixed(1)+')').join(' · ')||'—'}</td></tr>`;
+ }
+ $('stepTable').innerHTML=h;
+}
+
+const TIMB=[['サイン',[1],.01,1],['三角波',[1,0,.11,0,.04,0,.02],.01,1],['矩形波',[1,0,.33,0,.2,0,.14,0,.11],.01,1],['ノコギリ波',[1,.5,.33,.25,.2,.17,.14,.12],.01,1],['オルガン',[1,.8,.6,.5,.3,.2],.03,1],['フルート',[1,.1,.05],.07,.9],['クラリネット',[1,0,.75,0,.5,0,.14],.04,1],['オーボエ',[1,.9,.7,.5,.3,.2,.1],.05,1],['ファゴット',[1,.7,.5,.6,.3,.2],.05,.9],['ストリングス',[1,.6,.5,.4,.3,.2,.15,.1],.14,1],['ブラス',[1,.9,.8,.7,.5,.4,.3,.2,.1],.06,1],['ホルン',[1,.7,.4,.2],.08,1],['ピアノ風',[1,.5,.25,.12,.06],.005,.25],['ベル',[1,0,.6,0,0,.5,0,0,.3],.003,.08],['マリンバ',[1,0,0,.3],.003,.05],['ハープ',[1,.6,.3,.15],.004,.15],['チェンバロ',[1,.8,.7,.6,.4,.3,.2],.002,.1],['パッド',[1,.3,.1],.25,1],['グラス',[1,0,.2,0,0,.7],.02,.6],['ブザー',[1,1,1,1,1,1,1,1],.01,1]];
+let TB={h:TIMB[0][1],a:TIMB[0][2],s:TIMB[0][3],i:0},TBU=TB,TBL=TB;const PWC={};
+TIMB.forEach((t,i)=>{const o=document.createElement('option');o.value=i;o.textContent=t[0];$('timbre').appendChild(o)});
+{const o=document.createElement('option');o.value=-1;o.textContent='上段と同じ';$('timbre2').appendChild(o)}
+TIMB.forEach((t,i)=>{const o=document.createElement('option');o.value=i;o.textContent=t[0];$('timbre2').appendChild(o)});$('timbre2').value=-1;
+function setTimbre(i){const t=TIMB[i];TBU={h:t[1],a:t[2],s:t[3],i};if(+$('timbre2').value<0)TBL=TBU}
+function setTimbre2(i){if(i<0){TBL=TBU;return}const t=TIMB[i];TBL={h:t[1],a:t[2],s:t[3],i}}
+function tim(o){const k=TB.i||0;if(!PWC[k]){const re=new Float32Array(TB.h.length+1),im=new Float32Array(TB.h.length+1);TB.h.forEach((x,j)=>im[j+1]=x);PWC[k]=ac.createPeriodicWave(re,im)}o.setPeriodicWave(PWC[k])}
+function repeatEv(r){const b=r.blk;if(!b||!b.some(x=>x.re))return r.ev;
+ const order=[];let i=0,st=0;const cnt={};
+ while(i<b.length&&order.length<2000){if(b[i].rs)st=i;order.push(i);
+  if(b[i].re){const k=(cnt[i]=(cnt[i]||0)+1);if(k<b[i].re){i=st;continue}cnt[i]=0}
+  i++}
+ const o=[];let off=0;
+ order.forEach(j=>{const B=b[j];r.ev.forEach(e=>{if(e.bk===j)o.push({...e,ts:e.ts-B.s0+off})});off+=B.s1-B.s0});
+ return o}
+function expandEv(evs){const o=[];evs.forEach(e=>{
+ if(e.silent||e.rest){o.push(e);return}
+ if(e.glTo!==undefined&&e.steps.length&&e.glTo!==e.steps[0]){const a0=e.steps[0],b0=e.glTo,dr=b0>a0?1:-1,seq=[a0],nat=Object.values(LV);
+  for(let v=a0+dr;v!==b0&&seq.length<80;v+=dr){if(nat.includes(((v%N)+N)%N))seq.push(v)}
+  const n=seq.length;seq.forEach((v,i)=>o.push({...e,glTo:undefined,ts:e.ts+i*e.ds/n,ds:e.ds/n,steps:i?[v]:e.steps,legato:1,fer:0}));return}
+ if(e.trm){const u=.5/Math.pow(2,e.trm-1)*(e.ds/e.d);for(let t=0;t<e.ds-.01;t+=u)o.push({...e,trm:0,ts:e.ts+t,ds:Math.min(u,e.ds-t),legato:0});return}
+ if(e.trl){for(let t=0,i=0;t<e.ds-.02;t+=.07,i++)o.push({...e,trl:0,ts:e.ts+t,ds:Math.min(.07,e.ds-t),steps:e.steps.map(a=>i%2?a+LV.D:a),legato:1});return}
+ if(e.arp){e.steps.forEach((a,i)=>o.push({...e,arp:0,ts:e.ts+i*.06,ds:Math.max(.06,e.ds-i*.06),steps:[a]}));return}
+ o.push(e)});return o}
+const hz=a=>261.63*Math.pow(2,Math.floor(a/N)+CENT[((a%N)+N)%N]/1200);
+const cc=x=>Math.floor(x/N)*1200+CENT[((x%N)+N)%N];
+const K53={'#':'S',b:'F',j:'HS',d:'HF',"'":'U','.':'D',x:'X'},A53={'#':4,b:-4,"'":1,'.':-1,j:2,d:-2,x:8};
+const AC53={0:"",1:"'",2:"j",3:"j'",4:"#",[-1]:".",[-2]:"d",[-3]:"d.",[-4]:"b"};
+const S53="4/4\n4=120\n#b=n\n\nC-E.-G2 C-E-G2\no5 C4 E.4 G4 E4\n\nC-F-A.2 F-A.-C2\no5 F2 A.2",S12="4/4\n4=120\n#b=n\n\nC-E-G2 C-F-A2\no5 C4 E4 G4 E4\n\nF-A-C2 C-E-G2\no5 F2 A2";
+const T12=[[2,"sus2","9/8"],[3,"−","6/5"],[4,"","5/4"],[5,"sus4","4/3"]],F12=[[0,"(no5)","なし"],[6,"(5-1)","tritone"],[7,"","3/2"],[8,"(5+1)","aug5"]],E12=[[0,"","なし"],[8,"b6","8/5"],[9,"6","5/3"],[10,"7","9/5"],[11,"△7","15/8"]];
+const P12=[["長三和音",4,7,0],["短三和音",3,7,0],["dim ∘",3,6,0],["aug +",4,8,0],["属7",4,7,10],["maj7",4,7,11],["m7",3,7,10],["half-dim ∅",3,6,10],["sus2",2,7,0],["sus4",5,7,0]];
+const N12="C C# D Eb E F F# G Ab A Bb B";
+const CFGS={
+'12':{n:12,lv:{C:0,D:2,E:4,F:5,G:7,A:9,B:11},prim:N12,ac:{0:"",1:"#",2:"x",[-1]:"b",[-2]:"bb"},acc:{'#':1,b:-1,x:2},kind:{'#':'S',b:'F',x:'X'},th:T12,fi:F12,ex:E12,sp:{"3,6":"∘","4,8":"+"},pre:P12,st:{root:0,t:4,f:7,e:0},hd:[3,6,10],sl:2,sh:5,mn:[3,4],sample:S12,rin:"C E G",sub:"12等分平均律。1 step = 100c。# +1、b −1、x +2。自然音 C0 D2 E4 F5 G7 A9 B11。"},
+'12ji':{n:12,lv:{C:0,D:2,E:4,F:5,G:7,A:9,B:11},prim:N12,ac:{0:"",1:"#",2:"x",[-1]:"b",[-2]:"bb"},acc:{'#':1,b:-1,x:2},kind:{'#':'S',b:'F',x:'X'},th:T12,fi:F12,ex:E12,sp:{"3,6":"∘","4,8":"+"},pre:P12,st:{root:0,t:4,f:7,e:0},hd:[3,6,10],sl:2,sh:5,mn:[3,4],sample:S12,rin:"C E G",cent:[0,111.73,203.91,315.64,386.31,498.04,590.22,701.96,813.69,884.36,1017.6,1088.27],sub:"12音の5リミット純正律(1/1 16/15 9/8 6/5 5/4 4/3 45/32 3/2 8/5 5/3 9/5 15/8)。ルートに関わらず同じ音高で鳴ります。"},
+'31':{n:31,lv:{C:0,D:5,E:10,F:13,G:18,A:23,B:28},prim:"C C' C# Db D. D D' D# Eb E. E E' F. F F' F# Gb G. G G' G# Ab A. A A' A# Bb B. B B' C.",ac:{0:"",1:"'",2:"#",3:"#'",[-1]:".",[-2]:"b",[-3]:"b."},acc:{'#':2,b:-2,"'":1,'.':-1,x:4},kind:{'#':'S',b:'F',"'":'HS','.':'HF',x:'X'},th:[[5,"sus2","9/8"],[6,"sus2'","8/7"],[7,"=","7/6"],[8,"−","6/5"],[9,"◻","11/9"],[10,"","5/4"],[11,"▲","9/7"],[12,"sus4.","21/16"],[13,"sus4","4/3"],[14,"sus4'","11/8"]],fi:[[0,"(no5)","なし"],[15,"(5-3)","45/32"],[16,"(5-2)","64/45"],[18,"","3/2"],[20,"(5+2)","25/16"]],ex:[[0,"","なし"],[21,"b6","8/5"],[22,"6◻","18/11"],[23,"6","5/3"],[25,"7h","7/4"],[26,"7","9/5"],[27,"7◻","11/6"],[28,"△7","15/8"]],sp:{"8,16":"∘","10,20":"+"},pre:[["長三和音",10,18,0],["短三和音",8,18,0],["中立",9,18,0],["dim ∘",8,16,0],["aug +",10,20,0],["属7",10,18,26],["H7",10,18,25],["maj7",10,18,28],["m7",8,18,26],["half-dim ∅",8,16,26],["sus2",5,18,0],["sus4",13,18,0]],st:{root:0,t:10,f:18,e:0},h7:[10,18,25],hd:[8,16,26],sl:6,sh:12,mn:[8,10],sample:S12,rin:"C E G",sub:"1 step = 38.71c。完全5度 = 18 step。' 半♯(+1)、. 半♭(−1)、# +2、b −2。自然音 C0 D5 E10 F13 G18 A23 B28。"},
+'41':{n:41,lv:{C:0,D:7,E:14,F:17,G:24,A:31,B:38},prim:"C C' Cj Db C# Dd D. D D' Dj Eb D# Ed E. E E' F. F F' Fj Gb F# Gd G. G G' Gj Ab G# Ad A. A A' Aj Bb A# Bd B. B B' C.",ac:AC53,acc:A53,kind:K53,th:[[6,"sus2.","10/9"],[7,"sus2","9/8"],[8,"sus2'","8/7"],[9,"=","7/6"],[10,"−py","32/27"],[11,"−","6/5"],[12,"◻","11/9"],[13,"","5/4"],[14,"py","81/64"],[15,"▲","9/7"],[16,"sus4.","21/16"],[17,"sus4","4/3"],[18,"sus4'","27/20"]],fi:[[0,"(no5)","なし"],[20,"(5-4)","45/32"],[21,"(5-3)","64/45"],[23,"(5-1)","40/27"],[24,"","3/2"],[25,"(5+1)","243/160"],[26,"(5+2)","25/16"],[27,"(5+3)","128/81"]],ex:[[0,"","なし"],[28,"b6","8/5"],[29,"6◻","18/11"],[30,"6","5/3"],[31,"6py","27/16"],[33,"7h","7/4"],[34,"7py","16/9"],[35,"7","9/5"],[36,"7◻","11/6"],[37,"△7","15/8"],[38,"△7py","243/128"]],sp:{"11,21":"∘","13,27":"+","14,27":"+py"},pre:[["長三和音",13,24,0],["短三和音",11,24,0],["ピタゴラス長",14,24,0],["ピタゴラス短",10,24,0],["中立",12,24,0],["dim ∘",11,21,0],["aug +",13,27,0],["属7",13,24,35],["H7",13,24,33],["maj7",13,24,37],["m7",11,24,35],["half-dim ∅",11,21,35],["sus2",7,24,0],["sus4",17,24,0]],st:{root:0,t:13,f:24,e:0},h7:[13,24,33],hd:[11,21,35],sl:8,sh:16,mn:[11,13],sample:S53,rin:"C E. G",sub:"1 step = 29.27c。完全5度 = 24 step。' +1、. −1、j +2、d −2、# +4、b −4。自然音 C0 D7 E14 F17 G24 A31 B38。"},
+'53':{n:53,lv:{C:0,D:9,E:18,F:22,G:31,A:40,B:49},prim:"C C' Cj Cj' C# Db Dd. Dd D. D D' Dj Dj' D# Eb Ed. Ed E. E E' Ej F. F F' Fj Fj' F# Gb Gd. Gd G. G G' Gj Gj' G# Ab Ad. Ad A. A A' Aj Aj' A# Bb Bd. Bd B. B B' Bj C.",ac:AC53,acc:A53,kind:K53,th:[[8,"sus2.","10/9"],[9,"sus2","9/8"],[10,"sus2'","8/7"],[12,"=","7/6"],[13,"−py","32/27"],[14,"−","6/5"],[15,"◻","11/9"],[16,"◻'","16/13"],[17,"","5/4"],[18,"py","81/64"],[19,"▲","9/7"],[21,"sus4.","21/16"],[22,"sus4","4/3"],[23,"sus4'","27/20"]],fi:[[0,"(no5)","なし"],[26,"(5-5)","45/32"],[27,"(5-4)","64/45"],[30,"(5-1)","40/27"],[31,"","3/2"],[32,"(5+1)","243/160"],[34,"(5+3)","25/16"],[35,"(5+4)","128/81"]],ex:[[0,"","なし"],[36,"b6","8/5"],[38,"6◻","18/11"],[39,"6","5/3"],[40,"6py","27/16"],[43,"7h","7/4"],[44,"7py","16/9"],[45,"7","9/5"],[46,"7◻","11/6"],[48,"△7","15/8"],[49,"△7py","243/128"]],sp:{"14,27":"∘","17,35":"+","18,35":"+py"},pre:[["長三和音",17,31,0],["短三和音",14,31,0],["ピタゴラス長",18,31,0],["ピタゴラス短",13,31,0],["中立",15,31,0],["dim ∘",14,27,0],["aug +",17,35,0],["属7",17,31,45],["H7",17,31,43],["maj7",17,31,48],["m7",14,31,45],["half-dim ∅",14,27,45],["sus2",9,31,0],["sus4",22,31,0]],st:{root:0,t:17,f:31,e:0},h7:[17,31,43],hd:[14,27,45],sl:10,sh:21,mn:[14,17],sample:S53,rin:"C E. G",sub:"1 step = 22.64c。完全5度 = 31 step。' +1、. −1、j +2、d −2、# +4、b −4。自然音 C0 D9 E18 F22 G31 A40 B49。"}};
+let lastSample=$("score").value;
+function applyEdo(k){
+ CFG=CFGS[k];N=CFG.n;LV=CFG.lv;prim=CFG.prim.split(' ');AC=CFG.ac;KIND=CFG.kind;
+ ACC=Object.assign({},CFG.acc,{'\u266f':CFG.acc['#'],'\u266d':CFG.acc.b});if(CFG.acc["'"]!==undefined)ACC['\u2019']=CFG.acc["'"];if(CFG.acc.j!==undefined)ACC['\uff77']=CFG.acc.j;
+ TH=CFG.th;FI=CFG.fi;EX=CFG.ex;SP=CFG.sp;PRE=CFG.pre;CENT=CFG.cent||Array.from({length:N},(_,i)=>i*1200/N);
+ QS={};FM={};DL={};RT={};TH.forEach(x=>{QS[x[0]]=x[1];RT[x[0]]=x[2]});FI.forEach(x=>FM[x[0]]=x[1]);EX.forEach(x=>DL[x[0]]=x[1]);
+ Object.assign(st,CFG.st);buildUI();buildIdx();$("subtxt").textContent=CFG.sub;$("rin").value=CFG.rin;
+ if($("score").value===lastSample||!$("score").value)$("score").value=CFG.sample;lastSample=CFG.sample;
+ stepTable();render();rev();scoreInfo();
+}
+
+function crc32(u8){const t=crc32.t||(crc32.t=Array.from({length:256},(_,n)=>{let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;return c>>>0}));let r=-1;for(let i=0;i<u8.length;i++)r=t[(r^u8[i])&255]^(r>>>8);return(r^-1)>>>0}
+function zip1(name,u8){const nb=new TextEncoder().encode(name),crc=crc32(u8),n=u8.length;
+ const lh=new DataView(new ArrayBuffer(30));lh.setUint32(0,0x04034b50,true);lh.setUint16(4,20,true);lh.setUint16(6,0x0800,true);lh.setUint16(12,0x21,true);lh.setUint32(14,crc,true);lh.setUint32(18,n,true);lh.setUint32(22,n,true);lh.setUint16(26,nb.length,true);
+ const cd=new DataView(new ArrayBuffer(46));cd.setUint32(0,0x02014b50,true);cd.setUint16(4,20,true);cd.setUint16(6,20,true);cd.setUint16(8,0x0800,true);cd.setUint16(14,0x21,true);cd.setUint32(16,crc,true);cd.setUint32(20,n,true);cd.setUint32(24,n,true);cd.setUint16(28,nb.length,true);
+ const eo=new DataView(new ArrayBuffer(22));eo.setUint32(0,0x06054b50,true);eo.setUint16(8,1,true);eo.setUint16(10,1,true);eo.setUint32(12,46+nb.length,true);eo.setUint32(16,30+nb.length+n,true);
+ return new Blob([lh,nb,u8,cd,nb,eo],{type:'application/zip'})}
+function gainOf(ch){let pk=0;for(let i=0;i<ch.length;i++)pk=Math.max(pk,Math.abs(ch[i]));return pk>.95?.95/pk:1}
+function wavBytes(buf){const ch=buf.getChannelData(0),n=ch.length,sr=buf.sampleRate,g=gainOf(ch),ab=new ArrayBuffer(44+n*2),dv=new DataView(ab);
+ const w=(o,t)=>{for(let i=0;i<t.length;i++)dv.setUint8(o+i,t.charCodeAt(i))};
+ w(0,'RIFF');dv.setUint32(4,36+n*2,true);w(8,'WAVEfmt ');dv.setUint32(16,16,true);dv.setUint16(20,1,true);dv.setUint16(22,1,true);dv.setUint32(24,sr,true);dv.setUint32(28,sr*2,true);dv.setUint16(32,2,true);dv.setUint16(34,16,true);w(36,'data');dv.setUint32(40,n*2,true);
+ for(let i=0;i<n;i++)dv.setInt16(44+i*2,Math.max(-1,Math.min(1,ch[i]*g))*32767,true);return new Uint8Array(ab)}
+function mp3Bytes(buf){const ch=buf.getChannelData(0),n=ch.length,g=gainOf(ch),pcm=new Int16Array(n);
+ for(let i=0;i<n;i++)pcm[i]=Math.max(-1,Math.min(1,ch[i]*g))*32767;
+ const enc=new lamejs.Mp3Encoder(1,buf.sampleRate,128),out=[];
+ for(let i=0;i<n;i+=1152){const b=enc.encodeBuffer(pcm.subarray(i,i+1152));if(b.length)out.push(new Uint8Array(b))}
+ const f=enc.flush();if(f.length)out.push(new Uint8Array(f));return new Blob(out)}
+async function renderAudio(){
+ const r=scoreInfo(),evs=expandEv(repeatEv(r)),end=Math.max(1,...evs.map(e=>e.ts+e.ds))+1.5,sr=44100;
+ const ctx=new OfflineAudioContext(1,Math.ceil(end*sr),sr),wc={};
+ const wave=()=>{const k=TB.i||0;if(!wc[k]){const re=new Float32Array(TB.h.length+1),im=new Float32Array(TB.h.length+1);TB.h.forEach((x,j)=>im[j+1]=x);wc[k]=ctx.createPeriodicWave(re,im)}return wc[k]};
+ const mg=ctx.createGain();mg.gain.value=.9;mg.connect(ctx.destination);
+ evs.forEach(e=>{if(e.silent)return;e.steps.forEach(a=>{
+  TB=e.stf?TBL:TBU;const o=ctx.createOscillator(),g=ctx.createGain();o.setPeriodicWave(wave());o.frequency.value=hz(a);
+  const s=e.ts+.05,d=Math.max(.06,e.ds*(e.stc&&e.ten?.7:e.stc?.4:e.fer?1.8:(e.legato||e.ten)?1:.95)),v=Math.min(.8,.2*(e.vol||1)*(e.acn?1.7:1)*(e.sf?2.2:1)/Math.sqrt(e.steps.length));
+  const A=Math.min(TB.a,d*.5);g.gain.setValueAtTime(0,s);g.gain.linearRampToValueAtTime(v,s+A);g.gain.exponentialRampToValueAtTime(Math.max(.001,v*TB.s),s+Math.max(A+.01,d-.05));g.gain.exponentialRampToValueAtTime(.001,s+d);
+  o.connect(g).connect(mg);o.start(s);o.stop(s+d+.02)})});
+ return await ctx.startRendering()}
+async function exportAudio(kind){
+ const st=$('astat');
+ try{
+  const dl=window.claude&&await window.claude.use('downloads');
+  if(!dl){st.textContent='この環境では保存できません(公開ページを開いて実行してください)';return}
+  if(kind==='mp3'&&typeof lamejs==='undefined'){st.textContent='MP3エンコーダを読み込めませんでした(WAVなら出力できます)';return}
+  st.textContent='音声を生成中…';
+  const buf=await renderAudio(),data=kind==='wav'?wavBytes(buf):new Uint8Array(await mp3Bytes(buf).arrayBuffer());
+  st.textContent='保存の確認…';
+  await dl.save({filename:'score_'+kind+'.zip',data:zip1('score.'+kind,data)});
+  st.textContent='保存しました(zipの中に score.'+kind+' が入っています)';
+ }catch(err){st.textContent=err&&err.code==='declined'?'キャンセルしました':'失敗: '+((err&&err.message)||err)}
+}
+$('swav').onclick=()=>exportAudio('wav');$('smp3').onclick=()=>exportAudio('mp3');
+$("edo").onchange=()=>applyEdo($("edo").value);$("timbre").onchange=()=>setTimbre(+$("timbre").value);$("timbre2").onchange=()=>setTimbre2(+$("timbre2").value);
+
+$("edo").value='31';applyEdo('31');
+</script></main></body></html>
