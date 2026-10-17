@@ -84,7 +84,6 @@ textarea:focus{outline:2px solid var(--accent);outline-offset:-2px}
     var d=new Date();
     return String(d.getFullYear()%100).padStart(2,"0")+"123456789ABC".charAt(d.getMonth())+String(d.getDate()).padStart(2,"0");
   }
-  }
   try{
     var saved=localStorage.getItem(KEY);
     if(saved){var s=JSON.parse(saved);
