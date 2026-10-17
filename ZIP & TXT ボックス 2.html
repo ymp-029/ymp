@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ZIP & TXT ボックス</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --bg:#f6f5f1;--surface:#fff;--text:#1f1f1c;--muted:#6f6e68;--line:#dcdad2;
+  --accent:#2f6b4f;--accent-text:#fff;--danger:#b3402e;--soft:#eef3ef;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#161715;--surface:#202220;--text:#ecebe5;--muted:#9b9a92;--line:#3a3c38;
+    --accent:#6fbf98;--accent-text:#10241a;--danger:#e08a78;--soft:#26302a;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#161715;--surface:#202220;--text:#ecebe5;--muted:#9b9a92;--line:#3a3c38;
+  --accent:#6fbf98;--accent-text:#10241a;--danger:#e08a78;--soft:#26302a;
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.6 -apple-system,"Hiragino Sans","Noto Sans JP","Yu Gothic",system-ui,sans-serif}
+main{max-width:720px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:18px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:13px;margin:0 0 20px}
+.root{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--soft);
+  border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.root .ico{font-size:18px}
+.tree{margin:0 0 0 18px;padding:8px 0 0 18px;border-left:2px solid var(--line);list-style:none}
+.item{position:relative;margin:0 0 8px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.item::before{content:"";position:absolute;left:-18px;top:22px;width:16px;border-top:2px solid var(--line)}
+.row{display:flex;align-items:center;gap:6px;padding:8px 10px;flex-wrap:wrap}
+input.name{flex:1 1 140px;min-width:0;font:inherit;color:var(--text);background:transparent;
+  border:1px solid transparent;border-radius:6px;padding:4px 6px}
+input.name:hover,input.name:focus{border-color:var(--line);background:var(--bg);outline:none}
+.root input.name{font-weight:600}
+button{font:inherit;font-size:13px;cursor:pointer;color:var(--text);background:var(--surface);
+  border:1px solid var(--line);border-radius:8px;padding:5px 10px}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-text);border-color:var(--accent);font-weight:600}
+button.del{color:var(--danger)}
+button.toggle{padding:5px 8px}
+textarea{display:block;width:100%;min-height:140px;resize:vertical;font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,"Noto Sans Mono CJK JP",monospace;
+  color:var(--text);background:var(--bg);border:0;border-top:1px solid var(--line);
+  border-radius:0 0 10px 10px;padding:10px 12px}
+textarea:focus{outline:2px solid var(--accent);outline-offset:-2px}
+.meta{color:var(--muted);font-size:12px;margin-left:auto;white-space:nowrap}
+.add{margin:4px 0 0 18px;padding-left:18px}
+#msg{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));
+  background:var(--text);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:13px;
+  opacity:0;pointer-events:none;transition:opacity .2s;max-width:90%}
+#msg.show{opacity:1}
+</style>
+</head>
+<body>
+<main>
+  <h1>ZIP & TXT ボックス</h1>
+  <p class="sub">ZIPにまとめてダウンロードも、txtを1つずつダウンロードも、その場で編集もできます。</p>
+
+  <div class="root">
+    <span class="ico">📦</span>
+    <input class="name" id="zipName" aria-label="ZIPファイル名">
+    <span class="meta" id="count"></span>
+    <button class="primary" id="zipBtn">ZIPでダウンロード</button>
+  </div>
+  <ul class="tree" id="list"></ul>
+  <div class="add"><button id="addBtn">＋ txtを追加</button></div>
+</main>
+<div id="msg" role="status"></div>
+
+<script>
+(function(){
+  var KEY="zip-txt-box:v1";
+  var uid=0;
+  function nid(){return ++uid;}
+  function ymd(){
+    var d=new Date();
+    return String(d.getFullYear()%100).padStart(2,"0")+"123456789ABC".charAt(d.getMonth())+String(d.getDate()).padStart(2,"0");
+  }
+  var today=ymd(),hour=new Date().getHours();
+  var state={zip:today,files:[]};
+  for(var n=1;n<=hour;n++){
+    state.files.push({id:nid(),name:today+"_メモ"+n+".txt",body:"",open:n===1});
+  }
+  try{
+    var saved=localStorage.getItem(KEY);
+    if(saved){var s=JSON.parse(saved);
+      if(s&&Array.isArray(s.files)){state=s;state.files.forEach(function(f){f.id=nid();});}}
+  }catch(e){}
+
+  var $=function(i){return document.getElementById(i);};
+  var listEl=$("list"),zipName=$("zipName"),msgEl=$("msg"),msgT;
+
+  function persist(){
+    try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}
+  }
+  function toast(t){
+    msgEl.textContent=t;msgEl.classList.add("show");
+    clearTimeout(msgT);msgT=setTimeout(function(){msgEl.classList.remove("show");},2600);
+  }
+  function txtName(n){
+    n=(n||"").trim().replace(/[\\\/:*?"<>|]/g,"_")||"無題";
+    return /\.txt$/i.test(n)?n:n+".txt";
+  }
+  function zipFile(n){
+    n=(n||"").trim().replace(/[\\\/:*?"<>|]/g,"_")||"archive";
+    return /\.zip$/i.test(n)?n:n+".zip";
+  }
+  function bytes(s){return new Blob([s]).size;}
+  function fmt(n){return n<1024?n+" B":(n/1024).toFixed(1)+" KB";}
+
+  async function save(filename,data){
+    var dl=null;
+    try{dl=window.claude&&window.claude.use?await window.claude.use("downloads"):null;}catch(e){}
+    if(!dl){toast("この環境ではダウンロードを使えません");return;}
+    try{
+      await dl.save({filename:filename,data:data});
+      toast("保存しました: "+filename);
+    }catch(e){
+      if(e&&e.code==="declined")return;
+      toast("保存できませんでした");
+    }
+  }
+
+  function render(){
+    listEl.textContent="";
+    state.files.forEach(function(f,i){
+      var li=document.createElement("li");li.className="item";
+
+      var row=document.createElement("div");row.className="row";
+      var tg=document.createElement("button");tg.className="toggle";
+      tg.textContent=f.open?"▾":"▸";tg.setAttribute("aria-label","編集を開閉");
+      var nm=document.createElement("input");nm.className="name";nm.value=f.name;
+      nm.setAttribute("aria-label","txtファイル名");
+      nm.addEventListener("input",function(){f.name=nm.value;persist();});
+      var meta=document.createElement("span");meta.className="meta";meta.textContent=fmt(bytes(f.body));
+      var dl=document.createElement("button");dl.textContent="ダウンロード";
+      dl.addEventListener("click",function(){save(txtName(f.name),f.body||"\n");});
+      var rm=document.createElement("button");rm.className="del";rm.textContent="削除";
+      rm.addEventListener("click",function(){state.files.splice(i,1);persist();render();});
+      row.append(tg,nm,meta,dl,rm);
+      li.appendChild(row);
+
+      if(f.open){
+        var ta=document.createElement("textarea");ta.value=f.body;
+        ta.setAttribute("aria-label",f.name+" の内容");
+        ta.addEventListener("input",function(){f.body=ta.value;meta.textContent=fmt(bytes(f.body));persist();});
+        li.appendChild(ta);
+      }
+      tg.addEventListener("click",function(){f.open=!f.open;render();});
+      listEl.appendChild(li);
+    });
+    $("count").textContent=state.files.length+" 個のtxt";
+  }
+
+  zipName.value=state.zip;
+  zipName.addEventListener("input",function(){state.zip=zipName.value;persist();});
+
+  $("addBtn").addEventListener("click",function(){
+    state.files.push({id:nid(),name:"新しいファイル.txt",body:"",open:true});
+    persist();render();
+    var last=listEl.querySelector("li:last-child textarea");if(last)last.focus();
+  });
+
+  $("zipBtn").addEventListener("click",async function(){
+    if(!window.JSZip){toast("ZIPライブラリを読み込めませんでした");return;}
+    if(!state.files.length){toast("txtがありません");return;}
+    var z=new JSZip(),used={};
+    state.files.forEach(function(f){
+      var n=txtName(f.name),base=n.replace(/\.txt$/i,""),k=n,c=1;
+      while(used[k.toLowerCase()]){c++;k=base+" ("+c+").txt";}
+      used[k.toLowerCase()]=1;
+      z.file(k,f.body);
+    });
+    var blob=await z.generateAsync({type:"blob"});
+    save(zipFile(state.zip),blob);
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
