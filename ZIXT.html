@@ -84,10 +84,6 @@ textarea:focus{outline:2px solid var(--accent);outline-offset:-2px}
     var d=new Date();
     return String(d.getFullYear()%100).padStart(2,"0")+"123456789ABC".charAt(d.getMonth())+String(d.getDate()).padStart(2,"0");
   }
-  var today=ymd(),hour=new Date().getHours();
-  var state={zip:today,files:[]};
-  for(var n=1;n<=hour;n++){
-    state.files.push({id:nid(),name:today+"_メモ"+n+".txt",body:"",open:n===1});
   }
   try{
     var saved=localStorage.getItem(KEY);
