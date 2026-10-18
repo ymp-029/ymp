@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>連打ボリューム</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<style>
+:root{
+  --bg:#ecebf4;--panel:#fff;--ink:#1b1c2b;--sub:#5d5f78;--track:#d9d8e6;
+  --level:#12a594;--zone:#e0306f;--zone-soft:rgba(224,48,111,.22);--btn:#1b1c2b;--btn-ink:#fff;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12131c;--panel:#1c1e2c;--ink:#f0eff8;--sub:#9a9cb8;--track:#2b2d40;
+  --level:#2dd4bf;--zone:#ff4f8b;--zone-soft:rgba(255,79,139,.25);--btn:#f0eff8;--btn-ink:#12131c;}}
+:root[data-theme="dark"]{
+  --bg:#12131c;--panel:#1c1e2c;--ink:#f0eff8;--sub:#9a9cb8;--track:#2b2d40;
+  --level:#2dd4bf;--zone:#ff4f8b;--zone-soft:rgba(255,79,139,.25);--btn:#f0eff8;--btn-ink:#12131c;}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;
+  min-height:100vh;display:flex;justify-content:center;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+main{width:100%;max-width:460px;padding:20px 20px 28px;display:flex;flex-direction:column;gap:16px}
+header{display:flex;justify-content:space-between;align-items:baseline}
+h1{font-family:"Dela Gothic One","Zen Kaku Gothic New",sans-serif;font-size:22px;margin:0;font-weight:400}
+.stats{display:flex;gap:18px;color:var(--sub);font-size:14px}
+.stats b{color:var(--ink);font-size:18px;font-variant-numeric:tabular-nums}
+.stage{background:var(--panel);border-radius:20px;padding:22px 20px;display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center}
+.readout{display:flex;flex-direction:column;gap:6px}
+.big{font-family:"Dela Gothic One",sans-serif;font-size:84px;line-height:1;font-variant-numeric:tabular-nums}
+.cps{color:var(--sub);font-size:15px}
+.cps b{color:var(--ink);font-size:20px;font-variant-numeric:tabular-nums}
+.goal{margin-top:10px;font-size:15px;color:var(--sub)}
+.goal b{color:var(--zone);font-size:20px}
+.hold{margin-top:8px;height:10px;border-radius:5px;background:var(--track);overflow:hidden}
+.hold i{display:block;height:100%;width:0;background:var(--zone)}
+.msg{min-height:22px;font-weight:700;font-size:15px}
+.meter{position:relative;width:64px;height:300px;border-radius:14px;background:var(--track);overflow:hidden}
+.zone{position:absolute;left:0;right:0;background:var(--zone-soft);border-top:3px solid var(--zone);border-bottom:3px solid var(--zone)}
+.fill{position:absolute;left:10px;right:10px;bottom:0;height:0;background:var(--level);border-radius:8px 8px 0 0}
+.meter.on .zone{background:var(--zone)}
+.meter.on .fill{background:var(--ink)}
+#mash{appearance:none;border:0;border-radius:22px;background:var(--btn);color:var(--btn-ink);
+  font-family:"Dela Gothic One",sans-serif;font-size:28px;padding:34px 0;cursor:pointer;transition:transform .05s}
+#mash:active,#mash.down{transform:scale(.97)}
+#mash:focus-visible,.ghost:focus-visible{outline:3px solid var(--zone);outline-offset:3px}
+.hint{text-align:center;color:var(--sub);font-size:13px;margin:0}
+.ghost{appearance:none;background:none;border:1px solid var(--track);color:var(--sub);border-radius:999px;padding:4px 12px;font:inherit;font-size:13px;cursor:pointer}
+.overlay{position:fixed;inset:0;background:rgba(10,10,20,.72);display:flex;align-items:center;justify-content:center;padding:24px;z-index:5}
+.overlay.hide{display:none}
+.card{background:var(--panel);border-radius:22px;padding:28px 24px;max-width:380px;width:100%;text-align:center;display:flex;flex-direction:column;gap:14px}
+.card h2{font-family:"Dela Gothic One",sans-serif;font-weight:400;font-size:26px;margin:0}
+.card p{margin:0;line-height:1.7;color:var(--sub);font-size:15px;text-align:left}
+.card .score{font-family:"Dela Gothic One",sans-serif;font-size:56px;color:var(--ink)}
+.go{appearance:none;border:0;border-radius:16px;background:var(--zone);color:#fff;font-family:"Dela Gothic One",sans-serif;font-size:20px;padding:16px;cursor:pointer}
+@media (prefers-reduced-motion:reduce){#mash{transition:none}}
+@media (max-width:380px){.big{font-size:68px}.meter{height:250px}}
+.video{aspect-ratio:16/9;background:var(--track);border-radius:14px;overflow:hidden}
+.video iframe{width:100%;height:100%;border:0;display:block}
+.urlrow{display:flex;gap:8px}
+.urlrow input{flex:1;min-width:0;border:1px solid var(--track);background:var(--panel);color:var(--ink);border-radius:12px;padding:10px 12px;font:inherit;font-size:14px;-webkit-user-select:text;user-select:text}
+.ytst{font-size:13px;color:var(--sub);min-height:18px}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>連打ボリューム</h1>
+    <div class="stats"><span>ラウンド <b id="rd">1</b>/5</span><span>スコア <b id="sc">0</b></span></div>
+  </header>
+
+  <section class="stage" aria-live="off">
+    <div class="readout">
+      <div class="big"><span id="vol">0</span></div>
+      <div class="cps">連打 <b id="cps">0</b> 回/秒</div>
+      <div class="goal">目標ボリューム <b id="tg">50</b></div>
+      <div class="goal">残り <b id="tl" style="color:var(--ink)">15.0</b> 秒</div>
+      <div class="hold" title="目標ゾーンに入っている時間"><i id="hold"></i></div>
+      <div class="msg" id="msg" role="status"></div>
+    </div>
+    <div class="meter" id="meter" aria-hidden="true">
+      <div class="zone" id="zone"></div>
+      <div class="fill" id="fill"></div>
+    </div>
+  </section>
+
+  <div class="video"><div id="yt"></div></div>
+  <button id="mash" type="button">連打！</button>
+  <p class="hint">スペースキー・Enter・タップで連打。速く叩くほど音が大きくなり、止めると小さくなります。</p>
+  <div style="text-align:center"><button class="ghost" id="mute" type="button">音: オン</button></div>
+</main>
+
+<div class="overlay" id="ov">
+  <div class="card">
+    <h2 id="ovT">連打ボリューム</h2>
+    <div class="score" id="ovS" hidden></div>
+    <p id="ovP">連打のスピードがそのまま音量になります。ピンクの目標ゾーンに音量メーターを入れて、1.5秒キープすれば成功。全5ラウンド、制限時間は各15秒です。下にYouTubeのURLを貼って読み込んでからスタートすると、連打の速さで動画の音量が変わります。端末の音量は中くらいにしておいてください。</p>
+    <div class="urlrow"><input id="url" type="text" inputmode="url" placeholder="YouTubeのURLを貼り付け" aria-label="YouTubeのURL"><button class="ghost" id="load" type="button">読み込む</button></div>
+    <div class="ytst" id="ytst" role="status">先に動画を読み込むと、その動画の音量で遊べます</div>
+    <button class="go" id="go" type="button">スタート</button>
+  </div>
+</div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+(function(){
+  var TOL=1.5, HOLD_NEED=1.5, ROUND_TIME=15, ROUNDS=5, PER_CPS=1, MAXV=15;
+  var $=function(id){return document.getElementById(id)};
+  var el={rd:$('rd'),sc:$('sc'),vol:$('vol'),cps:$('cps'),tg:$('tg'),tl:$('tl'),hold:$('hold'),msg:$('msg'),
+          meter:$('meter'),zone:$('zone'),fill:$('fill'),mash:$('mash'),mute:$('mute'),ov:$('ov'),ovT:$('ovT'),ovS:$('ovS'),ovP:$('ovP'),go:$('go')};
+
+  var st={phase:'idle',round:1,score:0,target:50,time:ROUND_TIME,hold:0,vol:0,presses:[],last:0,pause:0};
+  var ac=null,osc=null,gain=null,muted=false;
+
+  function initAudio(){
+    if(ac){ if(ac.state==='suspended') ac.resume(); return; }
+    try{
+      var C=window.AudioContext||window.webkitAudioContext; if(!C) return;
+      ac=new C(); osc=ac.createOscillator(); gain=ac.createGain();
+      osc.type='triangle'; osc.frequency.value=330; gain.gain.value=0;
+      osc.connect(gain); gain.connect(ac.destination); osc.start();
+    }catch(e){ac=null}
+  }
+  var player=null,ytReady=false,pendingId=null,lastSent=-1;
+  window.onYouTubeIframeAPIReady=function(){ytReady=true;if(pendingId)makePlayer(pendingId)};
+  function makePlayer(id){
+    if(player&&player.loadVideoById){player.loadVideoById(id);return;}
+    player=new YT.Player('yt',{width:'100%',height:'100%',videoId:id,playerVars:{playsinline:1,rel:0},
+      events:{onReady:function(){try{player.setVolume(0)}catch(e){} $('ytst').textContent='読み込み完了。スタートできます';$('ytst').style.color='var(--level)'},
+      onError:function(){$('ytst').textContent='この動画は再生できません（埋め込み禁止など）。別の動画を試してください';$('ytst').style.color='var(--zone)'}}});
+  }
+  function parseId(t){
+    t=(t||'').trim();
+    var m=t.match(/(?:v=|youtu\.be\/|embed\/|shorts\/|live\/)([\w-]{11})/);
+    if(m) return m[1];
+    return /^[\w-]{11}$/.test(t)?t:null;
+  }
+  function setSound(v){ // v: 0..MAXV -> 動画の音量 0..100
+    if(!player||!player.setVolume) return;
+    var p=muted?0:Math.round(Math.min(1,v/MAXV)*100);
+    if(p===lastSent) return; lastSent=p;
+    try{player.setVolume(p)}catch(e){}
+  }
+  function blip(freq,dur){
+    if(!ac||muted) return;
+    try{
+      var o=ac.createOscillator(),g=ac.createGain();
+      o.frequency.value=freq;o.type='sine';g.gain.value=0.08;
+      o.connect(g);g.connect(ac.destination);
+      g.gain.setTargetAtTime(0,ac.currentTime+dur*0.5,dur*0.3);
+      o.start();o.stop(ac.currentTime+dur+0.2);
+    }catch(e){}
+  }
+
+  function newTarget(){ return 9+Math.floor(Math.random()*3); } // 9..11
+  function startRound(){
+    st.target=newTarget(); st.time=ROUND_TIME; st.hold=0; st.presses=[]; st.phase='play';
+    el.tg.textContent=st.target; el.rd.textContent=st.round;
+    el.zone.style.bottom=((st.target-TOL)/MAXV*100)+'%'; el.zone.style.height=(TOL*2/MAXV*100)+'%';
+    el.msg.textContent='連打スタート！'; el.msg.style.color='var(--sub)';
+  }
+  function press(){
+    if(st.phase!=='play') return;
+    st.presses.push(performance.now());
+  }
+  function endRound(ok){
+    st.phase='pause'; st.pause=1.3;
+    if(ok){
+      var gain_=100+Math.floor(st.time*10);
+      st.score+=gain_;
+      el.msg.textContent='成功！ +'+gain_; el.msg.style.color='var(--level)';
+      blip(660,.18); setTimeout(function(){blip(880,.25)},140);
+    }else{
+      el.msg.textContent='時間切れ…'; el.msg.style.color='var(--zone)';
+      blip(180,.4);
+    }
+    el.sc.textContent=st.score;
+  }
+  function finish(){
+    st.phase='over';
+    var rank=st.score>=1200?'ボリューム職人':st.score>=800?'連打マスター':st.score>=400?'なかなかの腕前':'ウォームアップ中';
+    el.ovT.textContent=rank; el.ovS.hidden=false; el.ovS.textContent=st.score;
+    el.ovP.textContent='合計スコアです。目標に早く合わせるほど、残り時間ボーナスが増えます。';
+    el.go.textContent='もう一度'; el.ov.classList.remove('hide');
+    setSound(0);
+  }
+
+  function tick(now){
+    var dt=Math.min(0.05,(now-st.last)/1000||0); st.last=now;
+    var raw=0,c=0;
+    if(st.phase==='play'||st.phase==='pause'){
+      while(st.presses.length&&now-st.presses[0]>1000) st.presses.shift();
+      c=st.presses.length; raw=Math.min(MAXV,c*PER_CPS);
+    }
+    st.vol+=(raw-st.vol)*Math.min(1,dt*7);
+    if(st.vol<0.2&&raw===0) st.vol=0;
+
+    if(st.phase==='play'){
+      st.time=Math.max(0,st.time-dt);
+      var inZone=Math.abs(st.vol-st.target)<=TOL;
+      st.hold=inZone?st.hold+dt:Math.max(0,st.hold-dt*2);
+      el.meter.classList.toggle('on',inZone);
+      if(st.hold>=HOLD_NEED) endRound(true);
+      else if(st.time<=0) endRound(false);
+    }else if(st.phase==='pause'){
+      st.pause-=dt;
+      if(st.pause<=0){
+        if(st.round>=ROUNDS) finish(); else { st.round++; startRound(); }
+      }
+    }
+    if(st.phase!=='over'&&st.phase!=='idle') setSound(st.phase==='play'?st.vol:st.vol*0.5);
+
+    var v=Math.round(st.vol);
+    el.vol.textContent=v; el.cps.textContent=c; el.fill.style.height=(st.vol/MAXV*100)+'%';
+    el.hold.style.width=Math.min(100,st.hold/HOLD_NEED*100)+'%';
+    el.tl.textContent=st.time.toFixed(1);
+    requestAnimationFrame(tick);
+  }
+
+  function begin(){
+    initAudio();
+    try{if(player&&player.playVideo){player.setVolume(0);player.playVideo()}}catch(e){}
+    st.round=1; st.score=0; st.vol=0; el.sc.textContent=0;
+    el.ov.classList.add('hide'); startRound();
+  }
+
+  el.go.addEventListener('click',begin);
+  el.mash.addEventListener('pointerdown',function(e){e.preventDefault();initAudio();press();el.mash.classList.add('down')});
+  ['pointerup','pointerleave','pointercancel'].forEach(function(n){el.mash.addEventListener(n,function(){el.mash.classList.remove('down')})});
+  document.addEventListener('keydown',function(e){
+    if(e.code==='Space'||e.code==='Enter'){
+      if(!el.ov.classList.contains('hide')) return;
+      e.preventDefault(); if(!e.repeat){press();el.mash.classList.add('down')}
+    }
+  });
+  document.addEventListener('keyup',function(e){if(e.code==='Space'||e.code==='Enter') el.mash.classList.remove('down')});
+  el.mute.addEventListener('click',function(){
+    muted=!muted; el.mute.textContent='音: '+(muted?'オフ':'オン'); if(muted) setSound(0);
+  });
+
+  el.zone.style.bottom=((st.target-TOL)/MAXV*100)+'%'; el.zone.style.height=(TOL*2/MAXV*100)+'%';
+  $('load').addEventListener('click',function(){
+    var id=parseId($('url').value);
+    var t=$('ytst');
+    if(!id){t.textContent='YouTubeのURLを確認してください'; t.style.color='var(--zone)'; return;}
+    t.textContent='読み込み中…'; t.style.color='var(--sub)'; if(ytReady) makePlayer(id); else pendingId=id;
+  });
+  $('url').addEventListener('keydown',function(e){if(e.key==='Enter')$('load').click()});
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
