@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>返し手倶楽部</title>
+<style>
+:root{--bg:#fbf6ee;--fg:#2a2320;--mute:#7a6c62;--card:#fff;--line:#e8dccd;--ac:#d9531e;--ac2:#fde6d8;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1c1816;--fg:#f3ebe3;--mute:#a89a8f;--card:#26211e;--line:#3a322d;--ac:#ff8a55;--ac2:#3a2519;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#1c1816;--fg:#f3ebe3;--mute:#a89a8f;--card:#26211e;--line:#3a322d;--ac:#ff8a55;--ac2:#3a2519;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:"Hiragino Sans","Noto Sans JP",system-ui,sans-serif;line-height:1.8}
+main{max-width:640px;margin:0 auto;padding:24px 18px 64px}
+header{text-align:center;padding:36px 0 24px}
+.fig{font-size:56px;letter-spacing:.1em}
+h1{font-size:2rem;margin:.2em 0;letter-spacing:.06em}
+.lead{color:var(--mute);margin:0}
+section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin-top:20px}
+h2{font-size:1.1rem;margin:0 0 10px;color:var(--ac)}
+label{display:flex;gap:10px;align-items:flex-start;padding:6px 0;cursor:pointer}
+input[type=checkbox]{width:20px;height:20px;margin-top:5px;accent-color:var(--ac)}
+#result{margin-top:12px;padding:12px;border-radius:12px;background:var(--ac2);display:none;font-weight:700;text-align:center}
+ol{padding-left:1.3em;margin:0}
+li{margin:6px 0}
+.tag{display:inline-block;font-size:.75rem;background:var(--ac2);color:var(--ac);border-radius:99px;padding:0 10px;margin-left:6px}
+button{font:inherit;background:var(--ac);color:#fff;border:0;border-radius:12px;padding:12px 22px;font-weight:700;cursor:pointer}
+button.sub{background:transparent;color:var(--mute);border:1px solid var(--line);padding:6px 12px;font-weight:400}
+.count{font-size:2.6rem;font-weight:800;text-align:center;line-height:1.2}
+.rank{text-align:center;color:var(--mute);margin-bottom:12px}
+.row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.warn{font-size:.9rem;color:var(--mute)}
+footer{text-align:center;color:var(--mute);font-size:.85rem;margin-top:28px}
+</style>
+</head>
+<body>
+<main>
+<header>
+<div class="fig">🙆‍♂️🤝🙌</div>
+<h1>返し手倶楽部</h1>
+<p class="lead">背中で組んだ手を、そのまま前へ。<br>それができる人たちのための小さな集会所。</p>
+</header>
+
+<section>
+<h2>入会チェック</h2>
+<label><input type="checkbox" class="chk"><span>背中側で、両手を組める（組み方は自由）</span></label>
+<label><input type="checkbox" class="chk"><span>組んだ手を離さず、頭の上を通して前に持ってこられる</span></label>
+<label><input type="checkbox" class="chk"><span>それを人に自慢したことがある</span></label>
+<div id="result">🎉 ようこそ、返し手倶楽部へ！</div>
+</section>
+
+<section>
+<h2>返し手のやり方<span class="tag">肩の柔らかさが命</span></h2>
+<ol>
+<li>立ったまま、背中で両手を組む。指を絡めても、手を握り合っても、組み方は自由。</li>
+<li>肘を伸ばしたまま、組んだ手を背中から離して後ろへ持ち上げる。</li>
+<li>上体は立ったままで、組んだ手を頭の上へ回していく。</li>
+<li>手を頭の上から越えたら、手は組んだまま、前に来ている。</li>
+</ol>
+<p class="warn">※できる人は大体幼少期からできる人です。</p>
+<p class="warn">※痛みを感じたらすぐ中止。ウォームアップをして、無理は禁物です。</p>
+</section>
+
+<section>
+<h2>これって何て技？</h2>
+<p style="margin:0 0 10px;font-size:1.3rem;font-weight:800">通称：返し手<span class="tag">かえして</span></p>
+<p style="margin:0">背中にあった手が、頭の上を通って前に返ってくる。その様子から、この倶楽部ではこう呼びます。</p>
+<p style="margin:10px 0 0">医学的には、この動きそのものの正式な医学名は、たぶんありません。近いものはこのあたりです。</p>
+<ul style="margin:10px 0 0;padding-left:1.3em">
+<li><b>ショルダー・ディスロケート</b>：棒やバンドを持ち、腕を伸ばしたまま体の前から後ろへ回すエクササイズ。名前に反して、肩の可動域を広げるための動きです。この技はその逆方向で、より難しい版と言えます。</li>
+<li><b>肩関節の可動域（ROM）</b>：肩の伸展、肩甲骨の動き、胸の柔らかさが同時に大きく必要です。</li>
+<li><b>アプレースクラッチテスト</b>：背中側で手がどこまで届くかを見る、肩の柔軟性の検査。考え方が近いです。</li>
+</ul>
+<p class="warn">できる人は肩関節が柔らかい傾向があるかもしれません。ただ、できることが健康や異常を意味するわけではありません。繰り返して痛みや引っかかりが出るなら、整形外科や理学療法士に相談しましょう。</p>
+</section>
+
+<section>
+<h2>今日の記録</h2>
+<div class="count" id="n">0</div>
+<div class="rank" id="rank">まずは1回やってみよう</div>
+<div class="row">
+<button id="add">成功！ +1</button>
+<button class="sub" id="reset">リセット</button>
+</div>
+</section>
+
+<footer>サイト運営者：結愛一ノ葉（PN）<br>サイト作成協力AIモデル：Claude</footer>
+</main>
+<script>
+(function(){
+var chks=document.querySelectorAll('.chk'),res=document.getElementById('result');
+function upd(){var ok=[].every.call(chks,function(c){return c.checked});res.style.display=ok?'block':'none'}
+[].forEach.call(chks,function(c){c.addEventListener('change',upd)});
+
+var n=0,KEY='ushirode-count',el=document.getElementById('n'),rk=document.getElementById('rank');
+try{n=parseInt(localStorage.getItem(KEY),10)||0}catch(e){}
+function rank(v){
+ if(v>=30)return '称号：うしろ手マスター';
+ if(v>=10)return '称号：頭上名人';
+ if(v>=3)return '称号：頭上見習い';
+ if(v>=1)return '称号：入会したて';
+ return 'まずは1回やってみよう';
+}
+function draw(){el.textContent=n;rk.textContent=rank(n)}
+function save(){try{localStorage.setItem(KEY,String(n))}catch(e){}}
+document.getElementById('add').onclick=function(){n++;save();draw()};
+document.getElementById('reset').onclick=function(){n=0;save();draw()};
+draw();
+})();
+</script>
+</body>
+</html>
